@@ -1,0 +1,117 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ResearchBridge — find the Princeton researcher who can solve your problem</title>
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+<div class="grain" aria-hidden="true"></div>
+
+<!-- ── Search ─────────────────────────────────────────────── -->
+<section id="search-view" class="view is-active">
+  <div class="search-inner">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <span class="brand-name">ResearchBridge</span>
+    </div>
+
+    <h1 class="hero">
+      Princeton has <span class="count" id="hero-count">4,159</span> researchers.<br>
+      You need <em>one</em> of them.
+    </h1>
+    <p class="hero-sub">
+      Describe the technical problem you're stuck on. We match against what they've
+      actually published — not profiles, not tags — and show you the paper that proves it.
+    </p>
+
+    <form id="search-form" class="search-box" autocomplete="off">
+      <textarea id="problem-input" rows="3" placeholder="e.g. Our assay degrades above 40°C and we can't stabilize the enzyme…" aria-label="Describe your technical problem"></textarea>
+      <button type="submit" class="btn-primary" id="search-btn">
+        <span>Find researchers</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </button>
+    </form>
+
+    <div class="chips" id="scenario-chips" aria-label="Example problems"></div>
+
+    <p class="supply-note">
+      <strong>23,112</strong> abstracts indexed from public OpenAlex records.
+      No researcher had to sign up for any of this to exist.
+    </p>
+  </div>
+</section>
+
+<!-- ── Deck ───────────────────────────────────────────────── -->
+<section id="deck-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="back-btn" aria-label="New search">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <p class="topbar-problem" id="topbar-problem"></p>
+    <button class="shortlist-btn" id="shortlist-btn">
+      Shortlist <span class="badge" id="shortlist-count">0</span>
+    </button>
+  </header>
+
+  <div class="deck-wrap">
+    <div class="deck" id="deck" aria-live="polite"></div>
+
+    <div class="deck-empty" id="deck-empty" hidden>
+      <h2>That's everyone.</h2>
+      <p id="deck-empty-sub"></p>
+      <button class="btn-primary" id="view-shortlist-btn">Review shortlist</button>
+    </div>
+  </div>
+
+  <div class="deck-controls" id="deck-controls">
+    <button class="round-btn pass" id="pass-btn" aria-label="Pass">
+      <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    </button>
+    <p class="progress" id="progress"></p>
+    <button class="round-btn keep" id="keep-btn" aria-label="Shortlist">
+      <svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>
+    </button>
+  </div>
+
+  <p class="kbd-hint">
+    <kbd>←</kbd> pass · <kbd>→</kbd> shortlist · <kbd>drag</kbd> the card
+  </p>
+</section>
+
+<!-- ── Shortlist ──────────────────────────────────────────── -->
+<section id="shortlist-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="shortlist-back-btn" aria-label="Back to cards">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <p class="topbar-problem">Your shortlist</p>
+    <span class="topbar-spacer"></span>
+  </header>
+  <div class="shortlist-list" id="shortlist-list"></div>
+</section>
+
+<!-- ── Intro modal ────────────────────────────────────────── -->
+<div class="modal-backdrop" id="intro-modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="intro-title">
+    <header class="modal-head">
+      <h2 id="intro-title">Intro email</h2>
+      <button class="icon-btn" id="intro-close" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <div class="modal-body" id="intro-body"></div>
+    <footer class="modal-foot">
+      <p class="disclose" id="intro-hint"></p>
+      <button class="btn-primary" id="copy-btn">Copy email</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toast" id="toast" hidden></div>
+
+<script src="/static/app.js"></script>
+</body>
+</html>

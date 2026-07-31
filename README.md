@@ -49,6 +49,21 @@ Flags: `--major` for a same-field signal, `--no-llm` to skip rationale generatio
 
 Ranking blends the single most relevant paper (65%) with portfolio centrality (35%), so someone with one paper squarely on your problem outranks someone vaguely adjacent across the board. Each paper is claimed by one researcher — co-authors of a hot paper would otherwise fill half the list with identical evidence — and preprint/published pairs are deduped by normalized title.
 
+## Running the app
+
+```bash
+.venv/bin/uvicorn app.server:app --port 8000
+```
+
+Open http://localhost:8000. Describe a problem (or click a scenario chip), swipe through
+matches with the arrow keys or by dragging, then hit **Draft intro** on anyone shortlisted.
+
+Match results are cached to `data/cache/` keyed by query, so a repeated demo query is
+instant and free. The frontend ships no CDN assets — system fonts, local CSS/JS only — so
+the UI runs with wifi off; only the embedding and drafting calls need network.
+
+Intro emails use `gpt-4.1` (override with `RB_INTRO_MODEL`).
+
 ## Limitations
 
 - Built on public data only; researchers are not verified or opted in by default.
@@ -56,3 +71,4 @@ Ranking blends the single most relevant paper (65%) with portfolio centrality (3
 - OpenAlex has no department field; `dept` is the researcher's dominant topic subfield, so `--major` only matches against subfield names.
 - Seniority ("Established PI" vs "Early-career") is a heuristic from h-index and career span, not ground truth. About a third of authors have no OpenAlex author record and are scored neutrally.
 - No course-catalog data yet, so the "you're already in their class" warm-intro signal is not implemented.
+- We never guess contact addresses. OpenAlex has no email data, so the app tells you to look the recipient up on their department page rather than inventing a netid.
