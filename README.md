@@ -25,7 +25,28 @@ app/      swipe UI
 data/     generated index + researcher records (gitignored)
 ```
 
+## Building the index
+
+Put `OPENAI_API_KEY=...` in a `.env` file at the repo root, then:
+
+```bash
+python -m venv .venv && .venv/bin/pip install -r requirements.txt
+.venv/bin/python ingest/openalex.py     # ~4 min, no API key needed
+.venv/bin/python ingest/embed.py        # ~7 min, ~$0.05
+.venv/bin/python ingest/build_index.py
+```
+
+Sanity-check a query:
+
+```bash
+.venv/bin/python ingest/build_index.py --query "our enzyme assay degrades above 40C" -k 10
+```
+
+Current index: 4,159 Princeton researchers with 3+ works since Aug 2021, 23,112 embedded abstracts.
+
 ## Limitations
 
 - Built on public data only; researchers are not verified or opted in by default.
 - Matching is a discovery aid, not a recommendation.
+- OpenAlex has no department field; `dept` is the researcher's dominant topic subfield, which is an approximation.
+- Authors include grad students and postdocs, not just faculty. Seniority is not yet distinguished.
