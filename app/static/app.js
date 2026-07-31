@@ -76,7 +76,11 @@ $("search-form").addEventListener("submit", async (e) => {
     show("deck-view");
     renderDeck();
   } catch (err) {
-    toast("Search failed — is the index built?");
+    toast(
+      err instanceof TypeError
+        ? "Can't reach the server — is uvicorn still running?"
+        : "Search failed — check the terminal for the error."
+    );
     console.error(err);
   } finally {
     btn.disabled = false;
@@ -255,6 +259,50 @@ $("view-shortlist-btn").onclick = () => { renderShortlist(); show("shortlist-vie
 $("shortlist-back-btn").onclick = () => show("deck-view");
 $("back-btn").onclick = () => show("search-view");
 
+/* ── founder profile ─────────────────────────────── */
+
+const PROFILE_FIELDS = ["name", "year", "major", "project"];
+const PROFILE_KEY = "rb.founder";
+
+function loadProfile() {
+  let saved = {};
+  try {
+    saved = JSON.parse(localStorage.getItem(PROFILE_KEY) || "{}");
+  } catch {
+    /* corrupt entry is not worth failing the page over */
+  }
+  PROFILE_FIELDS.forEach((f) => {
+    const el = $(`f-${f}`);
+    if (!el) return;
+    if (saved[f]) el.value = saved[f];
+    el.addEventListener("input", saveProfile);
+  });
+}
+
+function saveProfile() {
+  const data = {};
+  PROFILE_FIELDS.forEach((f) => {
+    const v = $(`f-${f}`)?.value.trim();
+    if (v) data[f] = v;
+  });
+  try {
+    localStorage.setItem(PROFILE_KEY, JSON.stringify(data));
+  } catch {
+    /* private browsing — the profile just won't persist */
+  }
+}
+
+function founderPayload() {
+  const data = {};
+  PROFILE_FIELDS.forEach((f) => {
+    const v = $(`f-${f}`)?.value.trim();
+    if (v) data[f] = v;
+  });
+  // omit entirely when blank so the server's defaults (and the precomputed
+  // cache built against them) still apply
+  return Object.keys(data).length ? data : undefined;
+}
+
 /* ── intro modal ─────────────────────────────────── */
 
 let lastEmail = null;
@@ -274,6 +322,7 @@ async function openIntro(match) {
         researcher_id: match.researcher_id,
         work_id: match.matched_work.id,
         problem: state.problem,
+        ...(founderPayload() ? { founder: founderPayload() } : {}),
       }),
     });
     if (!res.ok) throw new Error(await res.text());
@@ -287,7 +336,14 @@ async function openIntro(match) {
     `;
     $("intro-hint").textContent = email.to_hint || "";
   } catch (err) {
-    $("intro-body").innerHTML = `<p class="loading-note">Couldn't draft the email. Check the API key and try again.</p>`;
+    // Distinguish "server isn't running" from "the API call failed" — they need
+    // different fixes and the old message blamed the key for both.
+    const offline = err instanceof TypeError;
+    $("intro-body").innerHTML = `<p class="loading-note">${
+      offline
+        ? "Can't reach the ResearchBridge server. Is <code>uvicorn</code> still running in your terminal?"
+        : `The draft request failed: ${esc(String(err.message || err).slice(0, 200))}`
+    }</p>`;
     console.error(err);
   }
 }
@@ -311,3 +367,4 @@ $("copy-btn").onclick = async () => {
 };
 
 loadScenarios();
+loadProfile();

@@ -21,9 +21,10 @@ Built for the PrincetonBuilds Ideathon.
 ```
 ingest/   OpenAlex pull, embedding, index build
 api/      matching + intro-email drafting
-app/      swipe UI
+app/      FastAPI server, swipe UI, demo cache warmer
 data/     generated index + researcher records (gitignored)
 ```
+
 
 ## Building the index
 
@@ -55,14 +56,36 @@ Ranking blends the single most relevant paper (65%) with portfolio centrality (3
 .venv/bin/uvicorn app.server:app --port 8000
 ```
 
-Open http://localhost:8000. Describe a problem (or click a scenario chip), swipe through
+Open **http://127.0.0.1:8000**. Describe a problem (or click a scenario chip), swipe through
 matches with the arrow keys or by dragging, then hit **Draft intro** on anyone shortlisted.
 
-Match results are cached to `data/cache/` keyed by query, so a repeated demo query is
-instant and free. The frontend ships no CDN assets — system fonts, local CSS/JS only — so
-the UI runs with wifi off; only the embedding and drafting calls need network.
+Leave that terminal running for as long as you're demoing. If it stops, the page still loads
+from browser cache but every action fails — the app now says so explicitly instead of blaming
+your API key.
+
+Fill in **Your details** on the landing page so drafted emails are signed by you. It's stored
+in `localStorage`, never sent anywhere except to draft the email.
 
 Intro emails use `gpt-4.1` (override with `RB_INTRO_MODEL`).
+
+## Demo hardening
+
+Warm the cache before presenting, so no step on stage waits on the network:
+
+```bash
+.venv/bin/python -m app.precompute --name "Alex Zeng" --major "Computer Science"
+```
+
+This runs all four scenarios plus intro emails for each one's top three matches into
+`data/cache/`. Pass the same details you typed into **Your details** — the founder profile is
+part of the intro cache key, so a mismatch silently falls back to a live API call.
+
+Verified: with `.env` removed entirely, all four scenarios still return 12 matches and a
+drafted intro from cache, in ~10ms. The frontend ships no CDN assets — system fonts, local
+CSS and JS only — so the whole demo path runs with wifi off.
+
+Still on you before Sunday: **record a screen capture of the working demo.** If something
+breaks live, you play the tape.
 
 ## Limitations
 

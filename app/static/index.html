@@ -10,37 +10,120 @@
 
 <div class="grain" aria-hidden="true"></div>
 
-<!-- ── Search ─────────────────────────────────────────────── -->
+<!-- ── Landing ────────────────────────────────────────────── -->
 <section id="search-view" class="view is-active">
-  <div class="search-inner">
+  <nav class="nav">
     <div class="brand">
       <span class="brand-mark" aria-hidden="true"></span>
       <span class="brand-name">ResearchBridge</span>
     </div>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#insight">Why it works</a>
+      <a href="#limits">Limitations</a>
+    </div>
+  </nav>
 
-    <h1 class="hero">
-      Princeton has <span class="count" id="hero-count">4,159</span> researchers.<br>
-      You need <em>one</em> of them.
-    </h1>
-    <p class="hero-sub">
-      Describe the technical problem you're stuck on. We match against what they've
-      actually published — not profiles, not tags — and show you the paper that proves it.
-    </p>
+  <div class="landing">
+    <header class="search-inner">
+      <p class="eyebrow">Princeton · public research data</p>
+      <h1 class="hero">
+        Princeton has <span class="count">4,159</span> researchers.<br>
+        You need <em>one</em> of them.
+      </h1>
+      <p class="hero-sub">
+        Describe the technical problem you're stuck on. ResearchBridge searches what
+        Princeton researchers have <strong>actually published</strong> — not profiles,
+        not self-reported tags — and hands you the specific paper that justifies the
+        match, plus an intro email you can send today.
+      </p>
 
-    <form id="search-form" class="search-box" autocomplete="off">
-      <textarea id="problem-input" rows="3" placeholder="e.g. Our assay degrades above 40°C and we can't stabilize the enzyme…" aria-label="Describe your technical problem"></textarea>
-      <button type="submit" class="btn-primary" id="search-btn">
-        <span>Find researchers</span>
-        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
-      </button>
-    </form>
+      <form id="search-form" class="search-box" autocomplete="off">
+        <textarea id="problem-input" rows="3" placeholder="e.g. Our assay degrades above 40°C and we can't stabilize the enzyme…" aria-label="Describe your technical problem"></textarea>
+        <button type="submit" class="btn-primary" id="search-btn">
+          <span>Find researchers</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+        </button>
+      </form>
 
-    <div class="chips" id="scenario-chips" aria-label="Example problems"></div>
+      <div class="chips" id="scenario-chips" aria-label="Example problems"></div>
 
-    <p class="supply-note">
-      <strong>23,112</strong> abstracts indexed from public OpenAlex records.
-      No researcher had to sign up for any of this to exist.
-    </p>
+      <details class="profile">
+        <summary>Your details <span>— so intro emails are signed by you, not "a Princeton undergraduate"</span></summary>
+        <div class="profile-grid">
+          <label>Name<input id="f-name" type="text" placeholder="Alex Zeng" autocomplete="off"></label>
+          <label>Year<input id="f-year" type="text" placeholder="junior" autocomplete="off"></label>
+          <label>Major<input id="f-major" type="text" placeholder="Computer Science" autocomplete="off"></label>
+          <label class="wide">What you're building<input id="f-project" type="text" placeholder="a low-cost water testing kit for rural clinics" autocomplete="off"></label>
+        </div>
+        <p class="profile-note">Saved in this browser only. Never sent anywhere except to draft your email.</p>
+      </details>
+
+      <dl class="stats">
+        <div><dt>4,159</dt><dd>researchers indexed</dd></div>
+        <div><dt>23,112</dt><dd>abstracts embedded</dd></div>
+        <div><dt>0</dt><dd>signups required</dd></div>
+      </dl>
+    </header>
+
+    <section class="band" id="how">
+      <h2 class="band-title">How it works</h2>
+      <div class="steps">
+        <article class="step">
+          <span class="step-n">01</span>
+          <h3>Describe the blocker</h3>
+          <p>Plain language, the way you'd explain it to a friend. "Our cathode loses capacity after 300 cycles." No taxonomy to learn, no dropdowns.</p>
+        </article>
+        <article class="step">
+          <span class="step-n">02</span>
+          <h3>Get evidence, not scores</h3>
+          <p>Each card names the one paper that drove the match and says in a sentence how it connects. A bare "92% match" tells you nothing you can act on.</p>
+        </article>
+        <article class="step">
+          <span class="step-n">03</span>
+          <h3>Send a real email</h3>
+          <p>Shortlist who looks right, then generate an intro that cites their actual work. Specific beats generic — that's the difference between a reply and silence.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="band" id="insight">
+      <h2 class="band-title">Why this isn't another matching app</h2>
+      <div class="insight">
+        <p class="insight-lead">
+          Every marketplace dies of the cold start problem: empty on both sides, nobody
+          comes back. ResearchBridge doesn't have one, because <strong>one side is already
+          populated.</strong>
+        </p>
+        <p>
+          Princeton research output is public and indexed — papers, abstracts, topics,
+          citation records. We built the entire supply side from OpenAlex before a single
+          user existed. Open the app on day one and there are 4,159 researchers in it.
+        </p>
+        <p>
+          It also means faculty never have to do anything. They don't install an app, build
+          a profile, or check a queue — which matters, because they wouldn't. Founders are
+          the only active side. Researchers are discoverable from work they already
+          published years ago.
+        </p>
+      </div>
+    </section>
+
+    <section class="band" id="limits">
+      <h2 class="band-title">What this doesn't do</h2>
+      <ul class="limits">
+        <li><b>Public data only.</b> Nobody here opted in, verified their profile, or agreed to be contacted. Treat a match as a lead, not an endorsement.</li>
+        <li><b>It's a discovery aid, not a recommendation.</b> Semantic similarity finds plausible people; judging fit is still your job.</li>
+        <li><b>Departments are approximated.</b> OpenAlex has no department field, so we infer a field from each researcher's dominant topic. Expect the occasional odd label.</li>
+        <li><b>Seniority is a heuristic.</b> "Established PI" comes from h-index and career span, not a directory. About a third of authors have no author record and are ranked neutrally.</li>
+        <li><b>Authors include grad students and postdocs</b>, not just faculty. That's often useful — they reply more — but it isn't always who you wanted.</li>
+        <li><b>Drafted emails are drafts.</b> Read before sending, and look up the real address yourself. We never guess contact details.</li>
+      </ul>
+    </section>
+
+    <footer class="foot">
+      <p>Built for the PrincetonBuilds Ideathon. Data from <b>OpenAlex</b>, embeddings from <b>text-embedding-3-small</b>.</p>
+    </footer>
   </div>
 </section>
 

@@ -68,6 +68,7 @@ class IntroRequest(BaseModel):
     work_id: str | None = None
     problem: str
     founder: Founder = Founder()
+    refresh: bool = False
 
 
 def cache_path(req: MatchRequest) -> Path:
@@ -75,6 +76,20 @@ def cache_path(req: MatchRequest) -> Path:
         json.dumps([req.problem.strip().lower(), req.major, req.k]).encode()
     ).hexdigest()[:16]
     return CACHE_DIR / f"match_{key}.json"
+
+
+def intro_cache_path(req: IntroRequest) -> Path:
+    key = hashlib.sha256(
+        json.dumps(
+            [
+                req.problem.strip().lower(),
+                req.researcher_id,
+                req.work_id,
+                sorted(req.founder.model_dump().items()),
+            ]
+        ).encode()
+    ).hexdigest()[:16]
+    return CACHE_DIR / f"intro_{key}.json"
 
 
 @app.get("/api/scenarios")
@@ -109,10 +124,20 @@ def api_match(req: MatchRequest):
 
 @app.post("/api/intro")
 def api_intro(req: IntroRequest):
+    path = intro_cache_path(req)
+    if path.exists() and not req.refresh:
+        with open(path) as f:
+            return {"cached": True, **json.load(f)}
+
     researchers = intro_mod.load_researchers()
     researcher, work = intro_mod.find(researchers, req.researcher_id, req.work_id)
     email = intro_mod.draft(researcher, work, req.problem, req.founder.model_dump())
-    return {"researcher": researcher["name"], **email}
+
+    payload = {"researcher": researcher["name"], **email}
+    CACHE_DIR.mkdir(parents=True, exist_ok=True)
+    with open(path, "w") as f:
+        json.dump(payload, f)
+    return {"cached": False, **payload}
 
 
 @app.get("/")
