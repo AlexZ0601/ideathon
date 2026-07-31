@@ -1,15 +1,16 @@
-# Data artifacts
-data/videos/*
-data/cache/*
-!data/videos/.gitkeep
-!data/cache/.gitkeep
+# Generated data (index + researcher records can be rebuilt from ingest/)
+data/*
+!data/.gitkeep
 *.npy
-*.mp4
+*.npz
 
 # Python
 __pycache__/
 *.py[cod]
 .venv/
+
+# Secrets
+.env
 
 # OS
 .DS_Store
