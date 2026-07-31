@@ -20,7 +20,9 @@
     <div class="nav-links">
       <a href="#how">How it works</a>
       <a href="#insight">Why it works</a>
+      <a href="#map">White space</a>
       <a href="#limits">Limitations</a>
+      <button class="nav-cta" id="open-map">White Space Map</button>
     </div>
   </nav>
 
@@ -109,6 +111,40 @@
       </div>
     </section>
 
+    <section class="band" id="map">
+      <h2 class="band-title">Also here: The White Space Map</h2>
+      <div class="mapband">
+        <div class="mapband-copy">
+          <p>
+            Same idea, pointed at markets instead of people. Embed everything Y Combinator
+            has funded <span class="dot built"></span> and everything people publicly
+            complain about <span class="dot want"></span>, then put both in one semantic
+            space and look for the holes.
+          </p>
+          <p>
+            Dense demand sitting far from anything already built is
+            <b>white space</b> — a problem people describe repeatedly that nobody has
+            turned into a company. Fly through the cloud, click a gap, read the real posts.
+          </p>
+          <p class="mapband-caveat">
+            Company copy and forum complaints are written differently enough that raw
+            embeddings separate them by style alone. We subtract each corpus's mean
+            direction first, which drops average cross-similarity from 0.46 to 0.33 and
+            makes the remaining distance topical rather than tonal.
+          </p>
+          <button class="btn-primary" id="open-map-2">
+            <span>Open the map</span>
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+        <dl class="stats mapband-stats">
+          <div><dt>6,049</dt><dd>YC companies</dd></div>
+          <div><dt>5,728</dt><dd>demand posts</dd></div>
+          <div><dt>13</dt><dd>gap clusters</dd></div>
+        </dl>
+      </div>
+    </section>
+
     <section class="band" id="limits">
       <h2 class="band-title">What this doesn't do</h2>
       <ul class="limits">
@@ -176,6 +212,54 @@
   <div class="shortlist-list" id="shortlist-list"></div>
 </section>
 
+<!-- ── White Space Map ────────────────────────────────────── -->
+<section id="ws-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="ws-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="ws-head">
+      <h2>The White Space Map</h2>
+      <p id="ws-stats">loading…</p>
+    </div>
+    <div class="ws-tools">
+      <label class="ws-check"><input type="checkbox" id="ws-toggle-supply" checked> Show built</label>
+      <button class="icon-btn" id="ws-reset" aria-label="Reset view">
+        <svg viewBox="0 0 24 24"><path d="M3 12a9 9 0 1 0 3-6.7M3 4v5h5"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <div class="ws-body">
+    <aside class="ws-side">
+      <p class="ws-side-lead">
+        Every point is a company that exists <span class="dot built"></span> or a person
+        describing a problem <span class="dot want"></span>. Clusters of demand sitting far
+        from anything built are <b>white space</b>.
+      </p>
+      <div class="ws-cluster-list" id="ws-cluster-list"></div>
+      <p class="ws-caveat">
+        Embedding distance is a discovery signal, not an oracle. These are candidates for
+        human evaluation — a gap can mean nobody wants it, not just that nobody built it.
+      </p>
+    </aside>
+
+    <div class="ws-stage">
+      <canvas id="ws-canvas"></canvas>
+      <div class="ws-labels" id="ws-labels"></div>
+      <div class="ws-loading" id="ws-loading"><div class="spinner"></div><p class="loading-note">Projecting 11,777 points…</p></div>
+      <div class="ws-legend">
+        <span><i class="dot built"></i> YC company</span>
+        <span><i class="dot want"></i> demand post</span>
+        <span><i class="dot gap"></i> gap cluster</span>
+      </div>
+      <p class="ws-hint">drag to orbit · scroll to zoom · click a label to fly in</p>
+    </div>
+  </div>
+
+  <article class="ws-detail" id="ws-detail" hidden></article>
+</section>
+
 <!-- ── Intro modal ────────────────────────────────────────── -->
 <div class="modal-backdrop" id="intro-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="intro-title">
@@ -195,6 +279,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="/static/whitespace.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>

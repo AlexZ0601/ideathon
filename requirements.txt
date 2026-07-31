@@ -5,3 +5,5 @@ requests
 tqdm
 fastapi
 uvicorn[standard]
+umap-learn
+scikit-learn

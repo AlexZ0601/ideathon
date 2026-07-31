@@ -68,6 +68,41 @@ in `localStorage`, never sent anywhere except to draft the email.
 
 Intro emails use `gpt-4.1` (override with `RB_INTRO_MODEL`).
 
+## The White Space Map
+
+A second view in the same app, pointed at markets instead of people. Embeds ~6k YC companies
+(supply) and ~5.7k Hacker News complaint posts (demand) into one semantic space, projects to
+3-D with UMAP, and flags dense demand clusters that sit far from anything already funded.
+
+```bash
+.venv/bin/python ingest/whitespace.py       # fetch + embed both sides, ~6 min, ~$0.03
+.venv/bin/python ingest/whitespace_map.py   # score gaps, cluster, label, project
+```
+
+Open it from the nav, or the section on the landing page. Drag to orbit, scroll to zoom,
+click a cluster to see its thesis, the nearest existing companies, and the real posts behind
+it. Rendering is hand-written WebGL — deck.gl would mean a CDN script, and the demo has to
+survive with wifi off.
+
+**Two methodological notes worth having ready for judges.**
+
+*Reddit was the intended demand source but its public JSON endpoints now block
+unauthenticated clients, and the official API needs per-user OAuth.* HN's Algolia index is
+open, keyless, and startup-adjacent. The tradeoff: HN skews heavily toward developers, so
+the gaps found skew toward developer tooling.
+
+*Raw embeddings separate the two corpora by writing style, not topic.* Polished company
+one-liners and conversational complaints look different enough that every demand point
+appears "far from everything built" for the wrong reason — which would make the whole map an
+artifact. `decorrelate_style()` subtracts each corpus's own mean direction first; average
+best-match cross-similarity drops from 0.464 to 0.333, and the two clouds interleave instead
+of separating. Gap scores are computed in that decorrelated space, not in the UMAP
+projection, since UMAP distorts distance badly enough that measuring on it would measure the
+artifact.
+
+Embedding distance is a discovery signal, not an oracle. A gap can mean nobody wants the
+thing, not just that nobody built it — these are candidates for human evaluation.
+
 ## Demo hardening
 
 Warm the cache before presenting, so no step on stage waits on the network:

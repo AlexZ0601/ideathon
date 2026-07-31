@@ -140,6 +140,16 @@ def api_intro(req: IntroRequest):
     return {"cached": False, **payload}
 
 
+@app.get("/api/whitespace")
+def api_whitespace():
+    path = ROOT / "data" / "whitespace.json"
+    if not path.exists():
+        raise HTTPException(
+            404, "whitespace.json missing — run ingest/whitespace.py then ingest/whitespace_map.py"
+        )
+    return FileResponse(path, media_type="application/json")
+
+
 @app.get("/")
 def index():
     return FileResponse(STATIC / "index.html")

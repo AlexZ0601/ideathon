@@ -366,5 +366,16 @@ $("copy-btn").onclick = async () => {
   }
 };
 
+/* ── white space map ─────────────────────────────── */
+
+const openMap = () => {
+  show("ws-view");
+  window.WhiteSpace.boot();
+  requestAnimationFrame(() => window.WhiteSpace.kick());
+};
+$("open-map").onclick = openMap;
+$("open-map-2").onclick = openMap;
+$("ws-back").onclick = () => show("search-view");
+
 loadScenarios();
 loadProfile();
