@@ -31,22 +31,28 @@ Put `OPENAI_API_KEY=...` in a `.env` file at the repo root, then:
 
 ```bash
 python -m venv .venv && .venv/bin/pip install -r requirements.txt
-.venv/bin/python ingest/openalex.py     # ~4 min, no API key needed
-.venv/bin/python ingest/embed.py        # ~7 min, ~$0.05
+.venv/bin/python ingest/openalex.py        # ~4 min, no API key needed
+.venv/bin/python ingest/enrich_authors.py  # ~1 min, adds h-index / career span
+.venv/bin/python ingest/embed.py           # ~7 min, ~$0.05
 .venv/bin/python ingest/build_index.py
 ```
 
-Sanity-check a query:
+Current index: 4,159 Princeton researchers with 3+ works since Aug 2021, 23,112 embedded abstracts.
+
+## Matching
 
 ```bash
-.venv/bin/python ingest/build_index.py --query "our enzyme assay degrades above 40C" -k 10
+.venv/bin/python api/match.py "our enzyme assay degrades above 40C" -k 10
 ```
 
-Current index: 4,159 Princeton researchers with 3+ works since Aug 2021, 23,112 embedded abstracts.
+Flags: `--major` for a same-field signal, `--no-llm` to skip rationale generation, `--json` for raw output. Rationales use `gpt-4.1-mini` (override with `RB_CHAT_MODEL`).
+
+Ranking blends the single most relevant paper (65%) with portfolio centrality (35%), so someone with one paper squarely on your problem outranks someone vaguely adjacent across the board. Each paper is claimed by one researcher — co-authors of a hot paper would otherwise fill half the list with identical evidence — and preprint/published pairs are deduped by normalized title.
 
 ## Limitations
 
 - Built on public data only; researchers are not verified or opted in by default.
 - Matching is a discovery aid, not a recommendation.
-- OpenAlex has no department field; `dept` is the researcher's dominant topic subfield, which is an approximation.
-- Authors include grad students and postdocs, not just faculty. Seniority is not yet distinguished.
+- OpenAlex has no department field; `dept` is the researcher's dominant topic subfield, so `--major` only matches against subfield names.
+- Seniority ("Established PI" vs "Early-career") is a heuristic from h-index and career span, not ground truth. About a third of authors have no OpenAlex author record and are scored neutrally.
+- No course-catalog data yet, so the "you're already in their class" warm-intro signal is not implemented.
