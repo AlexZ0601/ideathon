@@ -7,6 +7,8 @@
 <!-- inline data URI so the tab icon survives with wifi off, like everything else here -->
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff9d3d'/%3E%3Cstop offset='.55' stop-color='%23ff6b1a'/%3E%3Cstop offset='1' stop-color='%23ff3d68'/%3E%3C/linearGradient%3E%3CclipPath id='r'%3E%3Ccircle cx='20.2' cy='16' r='8.6'/%3E%3C/clipPath%3E%3C/defs%3E%3Ccircle cx='11.8' cy='16' r='8.6' fill='none' stroke='%23888' stroke-width='1.8'/%3E%3Ccircle cx='20.2' cy='16' r='8.6' fill='none' stroke='%23888' stroke-width='1.8'/%3E%3Ccircle cx='11.8' cy='16' r='8.6' fill='url(%23g)' clip-path='url(%23r)'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
+<!-- in head, before first paint: applying the saved theme later would flash -->
+<script src="/static/theme.js"></script>
 </head>
 <body>
 
@@ -39,6 +41,7 @@
       <a href="#map">White space</a>
       <a href="#limits">Limitations</a>
       <button class="nav-cta" id="open-map">White Space Map</button>
+      <button class="theme-toggle" id="theme-toggle" title="Theme">◐</button>
       <button class="nav-account" id="nav-account">Sign in</button>
     </div>
   </nav>
@@ -411,6 +414,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="/static/gradient.js"></script>
 <script src="/static/motion.js"></script>
 <script src="/static/whitespace.js"></script>
 <script src="/static/accounts.js"></script>

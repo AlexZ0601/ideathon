@@ -27,8 +27,10 @@
   --ease: cubic-bezier(.22,.61,.36,1);
 }
 
+/* Light palette, applied either because the OS asks for it or because the user
+   picked it. Kept in one place so the two selectors can't drift apart. */
 @media (prefers-color-scheme: light) {
-  :root {
+  :root:not([data-theme="dark"]) {
     --bg:          #f6f5f2;
     --bg-elev:     #ffffff;
     --surface:     #ffffff;
@@ -42,6 +44,21 @@
     --accent-soft: #d9600a14;
     --shadow:      0 20px 50px -20px #0000002e, 0 1px 3px #00000012;
   }
+}
+
+:root[data-theme="light"] {
+  --bg:          #f6f5f2;
+  --bg-elev:     #ffffff;
+  --surface:     #ffffff;
+  --surface-2:   #00000008;
+  --line:        #e2e0da;
+  --line-soft:   #00000012;
+  --text:        #17181d;
+  --text-dim:    #55596a;
+  --text-faint:  #8b8f9f;
+  --accent:      #d9600a;
+  --accent-soft: #d9600a14;
+  --shadow:      0 20px 50px -20px #0000002e, 0 1px 3px #00000012;
 }
 
 * { box-sizing: border-box; }
@@ -163,17 +180,28 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   margin: 0 0 34px;
 }
 
+/* Liquid-glass surfaces.
+   liquid-glass-js does true WebGL refraction, but it samples the page with
+   html2canvas — a CDN dependency and a full-page rasterise per frame, neither
+   of which this demo can afford. backdrop-filter gets most of the read for
+   free: the shader gradient moving underneath supplies the colour that makes
+   it look like glass rather than frosted plastic. */
 .search-box {
   position: relative;
-  background: var(--surface);
+  background: color-mix(in srgb, var(--surface) 62%, transparent);
+  backdrop-filter: blur(22px) saturate(180%);
+  -webkit-backdrop-filter: blur(22px) saturate(180%);
   border: 1px solid var(--line);
   border-radius: var(--radius);
   padding: 6px;
   display: flex; flex-direction: column; gap: 6px;
-  box-shadow: var(--shadow);
-  transition: border-color .25s var(--ease);
+  box-shadow: var(--shadow), inset 0 1px 0 #ffffff1f;
+  transition: border-color .25s var(--ease), box-shadow .25s var(--ease);
 }
-.search-box:focus-within { border-color: var(--accent); }
+.search-box:focus-within {
+  border-color: var(--accent);
+  box-shadow: var(--shadow), inset 0 1px 0 #ffffff2b, 0 0 0 4px var(--accent-soft);
+}
 
 #problem-input {
   background: transparent; border: 0; resize: none;
@@ -380,10 +408,12 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); opacity: 1
 
 .card {
   position: absolute; inset: 0;
-  background: var(--bg-elev);
+  background: color-mix(in srgb, var(--bg-elev) 78%, transparent);
+  backdrop-filter: blur(26px) saturate(170%);
+  -webkit-backdrop-filter: blur(26px) saturate(170%);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  box-shadow: var(--shadow);
+  box-shadow: var(--shadow), inset 0 1px 0 #ffffff1a;
   padding: 30px 30px 26px;
   display: flex; flex-direction: column;
   overflow: hidden;
@@ -936,6 +966,26 @@ kbd {
 /* Constellation behind the hero: points drifting in a field, linking when
    they get close. It is the product's mental model — things near each other
    in space are related — rather than decoration for its own sake. */
+/* Shader backdrop sits under everything, including the constellation. */
+#gradient-bg {
+  position: fixed; inset: 0; z-index: -1;
+  width: 100%; height: 100%;
+  display: block; pointer-events: none;
+}
+/* the shader paints its own bg colour, so the body gradients would double up */
+body:has(#gradient-bg) { background-image: none; }
+
+.theme-toggle {
+  flex: none;
+  width: 34px; height: 34px;
+  display: grid; place-items: center;
+  background: transparent; border: 1px solid var(--line);
+  border-radius: 9px; cursor: pointer;
+  color: var(--text-dim); font-size: 14px; line-height: 1;
+  transition: color .2s, border-color .2s, transform .2s var(--ease);
+}
+.theme-toggle:hover { color: var(--accent); border-color: var(--accent); transform: rotate(-18deg); }
+
 #constellation {
   position: fixed; inset: 0; z-index: 0;
   pointer-events: none; opacity: .55;
