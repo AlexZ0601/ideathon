@@ -11,7 +11,7 @@ A professor account *claims* one. Messages can be addressed to a researcher
 nobody has claimed yet, and are waiting for them if they ever do.
 """
 
-import json
+import json  # noqa: F401  (used by set_intake / get_seeking)
 import os
 import sqlite3
 import time
@@ -84,12 +84,30 @@ def connect():
 _con = None
 
 
+# Columns added after the first version shipped. CREATE TABLE IF NOT EXISTS
+# won't touch an existing table, so anyone with a db from yesterday needs these
+# added explicitly rather than silently missing them.
+LATER_COLUMNS = [
+    ("users", "identity", "TEXT"),
+    ("users", "seeking", "TEXT"),        # JSON array
+    ("users", "accepted_terms", "REAL"),
+]
+
+
+def _migrate(con):
+    for table, column, decl in LATER_COLUMNS:
+        cols = {r["name"] for r in con.execute(f"PRAGMA table_info({table})")}
+        if column not in cols:
+            con.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+    con.commit()
+
+
 def db():
     global _con
     if _con is None:
         _con = connect()
         _con.executescript(SCHEMA)
-        _con.commit()
+        _migrate(_con)
     return _con
 
 
@@ -117,6 +135,61 @@ def user_by_email(email):
 
 def user_by_id(uid):
     return row_to_dict(db().execute("SELECT * FROM users WHERE id = ?", (uid,)).fetchone())
+
+
+def set_intake(uid, identity=None, seeking=None, accepted_terms=None):
+    """The two matching questions, plus the terms checkbox."""
+    sets, vals = [], []
+    if identity is not None:
+        sets.append("identity = ?")
+        vals.append(identity)
+    if seeking is not None:
+        sets.append("seeking = ?")
+        vals.append(json.dumps(seeking))
+    if accepted_terms:
+        sets.append("accepted_terms = ?")
+        vals.append(time.time())
+    if not sets:
+        return
+    con = db()
+    con.execute(f"UPDATE users SET {', '.join(sets)} WHERE id = ?", (*vals, uid))
+    con.commit()
+
+
+def get_seeking(user):
+    try:
+        return json.loads(user.get("seeking") or "[]")
+    except (ValueError, TypeError):
+        return []
+
+
+def members(exclude_uid=None, identity=None, limit=50):
+    """People with accounts here.
+
+    The researcher index has 4,159 people in it from public data. This table
+    does not — it only holds people who actually signed up. Anything matching
+    against it is genuinely cold-start limited, and the UI says so.
+    """
+    q = "SELECT id, name, identity, seeking, role, created_at FROM users WHERE 1=1"
+    args = []
+    if exclude_uid:
+        q += " AND id != ?"
+        args.append(exclude_uid)
+    if identity:
+        q += " AND identity = ?"
+        args.append(identity)
+    q += " ORDER BY created_at DESC LIMIT ?"
+    args.append(limit)
+
+    out = []
+    for r in db().execute(q, args).fetchall():
+        d = row_to_dict(r)
+        d["seeking"] = get_seeking(d)
+        p = get_founder_profile(d["id"])
+        d["blurb"] = p.get("project") or p.get("bio") or ""
+        d["major"] = p.get("major")
+        out.append(d)
+    return out
 
 
 # ── founder profile ────────────────────────────────────

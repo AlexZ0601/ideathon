@@ -75,6 +75,67 @@
     if (badge) badge.textContent = String(A.user.unread || 0);
   }
 
+  /* ── intake questions ────────────────────────────── */
+
+  let OPTIONS = { identities: [], seeking: [] };
+  const intake = { identity: null, seeking: new Set() };
+
+  async function loadOptions() {
+    try {
+      OPTIONS = await api("/api/options");
+    } catch {
+      return;
+    }
+    const idBox = $("identity-pills");
+    idBox.innerHTML = "";
+    OPTIONS.identities.forEach((o) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pill";
+      b.textContent = o.label;
+      b.onclick = () => {
+        intake.identity = o.id;
+        [...idBox.children].forEach((c) => c.classList.toggle("is-on", c === b));
+        // a researcher signing up is almost never here to find a professor
+        if (o.id === "researcher" && !intake.seeking.size) {
+          document.querySelector('input[name="role"][value="researcher"]').checked = true;
+        }
+      };
+      idBox.append(b);
+    });
+
+    const seekBox = $("seeking-pills");
+    seekBox.innerHTML = "";
+    OPTIONS.seeking.forEach((o) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.className = "pill";
+      b.textContent = o.label;
+      b.onclick = () => {
+        intake.seeking.has(o.id) ? intake.seeking.delete(o.id) : intake.seeking.add(o.id);
+        b.classList.toggle("is-on", intake.seeking.has(o.id));
+        paintSeekingHint();
+      };
+      seekBox.append(b);
+    });
+  }
+
+  // Tell the user what their answer actually does, rather than collecting it
+  // and quietly changing the ranking behind their back.
+  function paintSeekingHint() {
+    const s = [...intake.seeking];
+    const senior = s.filter((x) => ["professor", "researcher", "advisor"].includes(x)).length;
+    const junior = s.filter((x) => ["cofounder", "employee"].includes(x)).length;
+    const hint = $("seeking-hint");
+    if (!s.length) return (hint.textContent = "");
+    if (senior && !junior)
+      hint.textContent = "We'll rank established PIs higher — people who run labs and take students.";
+    else if (junior && !senior)
+      hint.textContent =
+        "We'll rank early-career people higher — grad students and postdocs are the ones who actually leave to build something.";
+    else hint.textContent = "We'll rank on relevance alone, without favouring seniority either way.";
+  }
+
   /* ── auth modal ──────────────────────────────────── */
 
   let mode = "login";
@@ -95,6 +156,8 @@
     $("auth-submit").querySelector("span").textContent = signup ? "Create account" : "Sign in";
     $("auth-name-field").hidden = !signup;
     $("auth-roles").hidden = !signup;
+    $("intake-block").hidden = !signup;
+    $("terms-check").hidden = !signup;
     $("auth-password").autocomplete = signup ? "new-password" : "current-password";
     document.querySelectorAll(".auth-mode .seg-btn").forEach((b) =>
       b.classList.toggle("is-on", b.dataset.mode === mode)
@@ -124,7 +187,15 @@
       if (mode === "signup") {
         A.user = await api("/api/auth/signup", {
           method: "POST",
-          body: JSON.stringify({ email, password, name: $("auth-name").value.trim(), role }),
+          body: JSON.stringify({
+            email,
+            password,
+            name: $("auth-name").value.trim(),
+            role,
+            identity: intake.identity,
+            seeking: [...intake.seeking],
+            accept_terms: $("accept-terms").checked,
+          }),
         });
       } else {
         A.user = await api("/api/auth/login", {
@@ -397,9 +468,19 @@
 
   async function openThread(tid) {
     const { messages } = await api(`/api/messages/${tid}`);
+    // The translate action is for whoever is *receiving* founder-speak, so it
+    // only appears on a message someone else wrote.
+    const incoming = messages.find((m) => m.from_user !== A.user.id);
     $("msg-thread").innerHTML = `
-      <div class="thread-head"><h3>${esc(messages[0].subject)}</h3>
+      <div class="thread-head">
+        <h3>${esc(messages[0].subject)}</h3>
         ${messages[0].paper_title ? `<p class="thread-paper">Re: ${esc(messages[0].paper_title)}</p>` : ""}
+        ${
+          incoming
+            ? `<button class="ghost-btn plain-btn" id="plain-btn">Translate the jargon</button>
+               <div class="plain-out" id="plain-out" hidden></div>`
+            : ""
+        }
       </div>
       <div class="thread-msgs">
         ${messages
@@ -415,6 +496,38 @@
         <textarea id="reply-body" rows="3" placeholder="Write a reply…"></textarea>
         <button class="btn-primary" type="submit"><span>Send reply</span></button>
       </form>`;
+    if (incoming) {
+      $("plain-btn").onclick = async () => {
+        const btn = $("plain-btn");
+        const out = $("plain-out");
+        btn.disabled = true;
+        btn.textContent = "Translating…";
+        out.hidden = false;
+        out.innerHTML = `<div class="spinner"></div>`;
+        try {
+          const t = await A.translate(incoming.body, incoming.subject);
+          out.innerHTML = `
+            <p class="plain-kicker">In plain English</p>
+            <p class="plain-body">${esc(t.plain)}</p>
+            ${t.ask ? `<p class="plain-ask"><b>What they want:</b> ${esc(t.ask)}${
+              t.time_ask ? ` (${esc(t.time_ask)})` : ""
+            }</p>` : ""}
+            ${
+              t.glossary.length
+                ? `<dl class="glossary">${t.glossary
+                    .map((g) => `<dt>${esc(g.term)}</dt><dd>${esc(g.meaning)}</dd>`)
+                    .join("")}</dl>`
+                : `<p class="plain-none">No startup jargon to unpack — the message was already plain.</p>`
+            }`;
+        } catch (e) {
+          out.innerHTML = `<p class="plain-none">${esc(e.message)}</p>`;
+        } finally {
+          btn.disabled = false;
+          btn.textContent = "Translate the jargon";
+        }
+      };
+    }
+
     $("reply-form").onsubmit = async (e) => {
       e.preventDefault();
       const body = $("reply-body").value.trim();
@@ -453,6 +566,37 @@
     });
   };
 
+  /* ── terms ───────────────────────────────────────── */
+
+  let termsLoaded = false;
+  async function openTerms() {
+    window.showView("terms-view");
+    if (termsLoaded) return;
+    try {
+      const res = await fetch("/api/terms");
+      $("terms-body").innerHTML = `<div class="pane-inner">${await res.text()}</div>`;
+      termsLoaded = true;
+    } catch {
+      $("terms-body").innerHTML = `<div class="pane-inner"><p class="block-note">Couldn't load the terms.</p></div>`;
+    }
+  }
+
+  ["open-terms", "open-terms-2"].forEach((id) => {
+    const el = $(id);
+    if (el) el.onclick = openTerms;
+  });
+  $("open-terms-inline").onclick = () => {
+    $("auth-modal").hidden = true;
+    openTerms();
+  };
+  $("terms-back").onclick = () => window.showView("search-view");
+  A.openTerms = openTerms;
+
+  /* ── jargon translation ──────────────────────────── */
+
+  A.translate = async (body, subject) =>
+    api("/api/translate", { method: "POST", body: JSON.stringify({ body, subject }) });
+
   A.openAuth = openAuth;
   A.openAccount = openAccount;
   A.openMessages = openMessages;
@@ -464,4 +608,5 @@
   $("messages-back").onclick = () => openAccount();
 
   refresh();
+  loadOptions();
 })();

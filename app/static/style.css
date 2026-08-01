@@ -863,6 +863,134 @@ kbd {
   .msg-thread { display: none; }
 }
 
+/* ── intake, terms, translation ────────────────────── */
+
+.intake { display: flex; flex-direction: column; gap: 16px; }
+.intake-q { display: flex; flex-direction: column; gap: 9px; }
+.intake-label { margin: 0; font-size: 12.5px; font-weight: 600; color: var(--text); }
+.intake-label span { font-weight: 400; color: var(--text-faint); }
+.pill-row { display: flex; flex-wrap: wrap; gap: 7px; }
+.pill {
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  color: var(--text-dim); border-radius: 999px;
+  padding: 7px 13px; font: inherit; font-size: 12.5px; cursor: pointer;
+  transition: color .18s, border-color .18s, background .18s, transform .18s var(--ease);
+}
+.pill:hover { color: var(--text); border-color: var(--text-faint); }
+.pill.is-on {
+  background: var(--accent); border-color: var(--accent); color: #fff;
+  transform: translateY(-1px);
+}
+.intake-hint {
+  margin: 2px 0 0; font-size: 11.5px; line-height: 1.5; color: var(--accent);
+  animation: rise .3s var(--ease) both;
+}
+
+.terms-check { display: flex; gap: 10px; align-items: flex-start; font-size: 12px; color: var(--text-dim); line-height: 1.55; }
+.terms-check input { margin-top: 2px; accent-color: var(--accent); flex: none; width: 15px; height: 15px; }
+.link-btn {
+  background: none; border: 0; padding: 0;
+  color: var(--accent); font: inherit; font-size: inherit;
+  text-decoration: underline; cursor: pointer;
+}
+
+.legal { max-width: 68ch; }
+.legal-updated {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--text-faint); margin: 0 0 14px;
+}
+.legal h1 { font-family: var(--serif); font-weight: 400; font-size: 34px; margin: 0 0 18px; letter-spacing: -.02em; }
+.legal h2 { font-size: 15px; margin: 30px 0 9px; letter-spacing: -.01em; }
+.legal p { margin: 0 0 12px; color: var(--text-dim); font-size: 14.5px; line-height: 1.72; }
+.legal-lead { font-size: 16px !important; color: var(--text) !important; }
+.legal ul { margin: 0 0 12px; padding-left: 20px; color: var(--text-dim); font-size: 14.5px; line-height: 1.72; }
+.legal li { margin-bottom: 6px; }
+.legal b { color: var(--text); font-weight: 600; }
+.legal-flag {
+  border-left: 2px solid var(--accent);
+  background: var(--accent-soft);
+  padding: 14px 16px; border-radius: 0 8px 8px 0;
+}
+
+.plain-btn { margin-top: 12px; align-self: flex-start; font-size: 12.5px; padding: 8px 13px; }
+.plain-out {
+  margin-top: 12px; padding: 15px 17px;
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-left: 2px solid var(--accent); border-radius: 0 10px 10px 0;
+  animation: rise .3s var(--ease) both;
+}
+.plain-kicker {
+  font-family: var(--mono); font-size: 10px; letter-spacing: .11em; text-transform: uppercase;
+  color: var(--accent); margin: 0 0 8px;
+}
+.plain-body { margin: 0; font-size: 14px; line-height: 1.65; white-space: pre-wrap; }
+.plain-ask { margin: 12px 0 0; font-size: 13.5px; color: var(--text-dim); }
+.plain-ask b { color: var(--text); }
+.plain-none { margin: 0; font-size: 13px; color: var(--text-faint); }
+.glossary { margin: 14px 0 0; display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 12.5px; }
+.glossary dt { color: var(--accent); font-weight: 600; }
+.glossary dd { margin: 0; color: var(--text-dim); line-height: 1.5; }
+
+/* ── motion ────────────────────────────────────────── */
+
+/* Constellation behind the hero: points drifting in a field, linking when
+   they get close. It is the product's mental model — things near each other
+   in space are related — rather than decoration for its own sake. */
+#constellation {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none; opacity: .55;
+}
+@media (prefers-color-scheme: light) { #constellation { opacity: .42; } }
+
+.landing > * { position: relative; z-index: 1; }
+
+/* Sections arrive as you reach them */
+.reveal { opacity: 0; transform: translateY(22px); }
+.reveal.is-in {
+  opacity: 1; transform: none;
+  transition: opacity .7s var(--ease), transform .7s var(--ease);
+}
+
+/* Stat numbers count up; the odometer feel comes from the tabular figures */
+.stats dt { transition: color .3s var(--ease); }
+
+/* Buttons get a light sweep on hover */
+.btn-primary { position: relative; overflow: hidden; }
+.btn-primary::after {
+  content: ""; position: absolute; inset: 0;
+  background: linear-gradient(110deg, transparent 30%, #ffffff4d 50%, transparent 70%);
+  transform: translateX(-120%);
+}
+.btn-primary:hover::after { transform: translateX(120%); transition: transform .75s var(--ease); }
+
+/* The logo's lens breathes very slightly, so the mark reads as alive */
+@keyframes lens-pulse {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: .78; }
+}
+.brand-mark .cf-lens { animation: lens-pulse 4.5s ease-in-out infinite; }
+.brand:hover .cf-ring { opacity: .62; transition: opacity .3s var(--ease); }
+
+/* Step cards lift and light their rule on hover */
+.step { position: relative; transition: transform .28s var(--ease), border-color .28s; }
+.step::before {
+  content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 0;
+  background: linear-gradient(90deg, var(--accent), #ff3d68);
+  border-radius: 2px;
+  transition: width .45s var(--ease);
+}
+.step:hover { transform: translateY(-4px); border-color: var(--line); }
+.step:hover::before { width: 100%; }
+
+.chip { transition: color .2s, border-color .2s, background .2s, transform .2s var(--ease); }
+.chip:hover { transform: translateY(-2px); }
+
+@media (prefers-reduced-motion: reduce) {
+  #constellation { display: none; }
+  .reveal { opacity: 1; transform: none; }
+  .brand-mark .cf-lens { animation: none; }
+}
+
 /* ── toast ─────────────────────────────────────────── */
 
 .toast {

@@ -176,6 +176,11 @@
 
     <footer class="foot">
       <p>Built for the PrincetonBuilds Ideathon. Data from <b>OpenAlex</b>, embeddings from <b>text-embedding-3-small</b>.</p>
+      <p>
+        <button type="button" class="link-btn" id="open-terms">Terms &amp; Privacy</button>
+        · Researchers here are drawn from public records and did not sign up.
+        <button type="button" class="link-btn" id="open-terms-2">Request removal</button>
+      </p>
     </footer>
   </div>
 </section>
@@ -307,6 +312,18 @@
   </div>
 </section>
 
+<!-- ── Terms ──────────────────────────────────────────────── -->
+<section id="terms-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="terms-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <p class="topbar-problem">Terms &amp; Privacy</p>
+    <span class="topbar-spacer"></span>
+  </header>
+  <div class="pane" id="terms-body"><div class="spinner"></div></div>
+</section>
+
 <!-- ── Auth modal ─────────────────────────────────────────── -->
 <div class="modal-backdrop" id="auth-modal" hidden>
   <div class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
@@ -325,8 +342,8 @@
       <div class="auth-roles" id="auth-roles" hidden>
         <label class="role-card">
           <input type="radio" name="role" value="founder" checked>
-          <b>I'm a student</b>
-          <span>Find researchers who can solve your problem.</span>
+          <b>I'm looking for people</b>
+          <span>Describe a problem, get matched, send intros.</span>
         </label>
         <label class="role-card">
           <input type="radio" name="role" value="researcher">
@@ -334,6 +351,23 @@
           <span>Claim the profile we already built from your published work.</span>
         </label>
       </div>
+
+      <div class="intake" id="intake-block" hidden>
+        <div class="intake-q">
+          <p class="intake-label">Which of these is you?</p>
+          <div class="pill-row" id="identity-pills"></div>
+        </div>
+        <div class="intake-q">
+          <p class="intake-label">Who are you trying to meet? <span>Pick any</span></p>
+          <div class="pill-row" id="seeking-pills"></div>
+          <p class="intake-hint" id="seeking-hint"></p>
+        </div>
+      </div>
+
+      <label class="terms-check" id="terms-check" hidden>
+        <input type="checkbox" id="accept-terms">
+        <span>I've read and accept the <button type="button" class="link-btn" id="open-terms-inline">Terms &amp; Privacy</button>, including that researchers listed here are drawn from public data and never signed up.</span>
+      </label>
 
       <label class="field" id="auth-name-field" hidden>Name
         <input type="text" id="auth-name" autocomplete="name" placeholder="Alex Zeng">
@@ -377,6 +411,7 @@
 
 <div class="toast" id="toast" hidden></div>
 
+<script src="/static/motion.js"></script>
 <script src="/static/whitespace.js"></script>
 <script src="/static/accounts.js"></script>
 <script src="/static/app.js"></script>

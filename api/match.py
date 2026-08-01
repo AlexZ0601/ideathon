@@ -94,20 +94,48 @@ def _work_key(work):
     return "".join(ch for ch in title if ch.isalnum())[:80] or work["id"]
 
 
-def _score(work_sim, mean_sim, researcher, prefer_faculty):
+# What the founder is looking for decides which direction seniority helps in.
+# Wanting an advisor and wanting someone who might actually join your company
+# are close to opposite queries over the same index: a tenured PI runs a lab and
+# takes students; a senior grad student or postdoc is the one who leaves to
+# build something. Same 4,159 people, ranked in reverse.
+SENIORITY_PREF = {
+    "professor": +1,      # advisor, lab to join, someone to co-author with
+    "researcher": +1,
+    "advisor": +1,
+    "cofounder": -1,      # someone who might actually leave and build
+    "founder": -1,
+    "employee": -1,       # early-career hires
+    "collaborator": 0,
+    "anyone": 0,
+}
+
+
+def seniority_direction(seeking):
+    """+1 prefer established PIs, -1 prefer early-career, 0 neutral."""
+    if not seeking:
+        return +1  # matches the original behaviour when nothing is stated
+    votes = [SENIORITY_PREF.get(s, 0) for s in seeking]
+    total = sum(votes)
+    return 0 if total == 0 else (1 if total > 0 else -1)
+
+
+def _score(work_sim, mean_sim, researcher, direction):
     score = W_BEST * work_sim + W_MEAN * mean_sim
-    if prefer_faculty:
+    if direction:
         # modest nudge; never enough to outrank clearly better-matched work.
         # ~a third of authors have no OpenAlex author record (last-known
         # institution elsewhere); they score neutral, not bottom.
         sen = researcher.get("seniority") if (researcher.get("author_stats") or {}) else None
-        score += 0.03 * (0.5 if sen is None else sen)
+        sen = 0.5 if sen is None else sen
+        score += 0.03 * (sen if direction > 0 else (1.0 - sen))
     return score
 
 
-def match(problem_text, k=10, major=None, prefer_faculty=True):
+def match(problem_text, k=10, major=None, prefer_faculty=True, seeking=None):
     idx = load_index()
     qvec = embed_query(problem_text)
+    direction = seniority_direction(seeking) if seeking else (1 if prefer_faculty else 0)
 
     mean_sims = idx["researcher_vecs"] @ qvec
     work_sims = idx["work_vecs"] @ qvec
@@ -126,7 +154,7 @@ def match(problem_text, k=10, major=None, prefer_faculty=True):
         top = int(order[0])
         heapq.heappush(
             heap,
-            (-_score(float(work_sims[rows[top]]), float(mean_sims[i]), r, prefer_faculty),
+            (-_score(float(work_sims[rows[top]]), float(mean_sims[i]), r, direction),
              i, 0, [int(o) for o in order]),
         )
 
@@ -144,7 +172,7 @@ def match(problem_text, k=10, major=None, prefer_faculty=True):
             nxt = order[choice + 1]
             heapq.heappush(
                 heap,
-                (-_score(float(work_sims[rows[nxt]]), float(mean_sims[i]), r, prefer_faculty),
+                (-_score(float(work_sims[rows[nxt]]), float(mean_sims[i]), r, direction),
                  i, choice + 1, order),
             )
             continue
