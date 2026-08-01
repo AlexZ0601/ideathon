@@ -35,6 +35,7 @@ Rules:
 - Ask for one concrete, small thing: 15 minutes, or a pointer to the right person.
 - Plain, direct student voice. No flattery ("groundbreaking", "I was fascinated"), no filler, no MBA tone.
 - Never invent facts about the student or the researcher beyond what you are given.
+- If a resume excerpt is provided, you may cite one concrete thing from it (a course, project, or skill) when it is genuinely relevant to the researcher's work. Never inflate it, and never claim experience the resume does not state.
 - If the paper is only loosely related, be honest about the connection rather than overstating it.
 - Address the recipient by last name with the right title: "Prof. X" if they are an established PI, "Dr. X" or first name if they are early-career.
 
@@ -61,8 +62,13 @@ def draft(researcher, work, problem, founder, model=INTRO_MODEL):
 
     load_dotenv(ROOT / ".env")
     is_pi = (researcher.get("seniority") or 0) >= 0.5
+    student = {k: v for k, v in founder.items() if k != "resume_text"}
+    if founder.get("resume_text"):
+        # real background beats "a Princeton undergraduate", but the model must
+        # quote it rather than embellish it
+        student["resume_excerpt"] = founder["resume_text"][:2500]
     payload = {
-        "student": founder,
+        "student": student,
         "problem": problem,
         "researcher": {
             "name": researcher["name"],

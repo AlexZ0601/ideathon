@@ -17,6 +17,7 @@ const state = {
 function show(viewId) {
   document.querySelectorAll(".view").forEach((v) => v.classList.toggle("is-active", v.id === viewId));
 }
+window.showView = show;
 
 function toast(msg, ms = 2200) {
   const el = $("toast");
@@ -306,8 +307,10 @@ function founderPayload() {
 /* ── intro modal ─────────────────────────────────── */
 
 let lastEmail = null;
+let lastMatch = null;
 
 async function openIntro(match) {
+  lastMatch = match;
   const modal = $("intro-modal");
   modal.hidden = false;
   $("intro-body").innerHTML = `<div class="spinner"></div><p class="loading-note">Drafting an email that cites ${esc(match.matched_work.title.slice(0, 60))}…</p>`;
@@ -363,6 +366,29 @@ $("copy-btn").onclick = async () => {
     toast("Email copied to clipboard");
   } catch {
     toast("Copy failed — select the text manually");
+  }
+};
+
+$("send-btn").onclick = async () => {
+  if (!lastEmail || !lastMatch) return;
+  const btn = $("send-btn");
+  btn.disabled = true;
+  try {
+    const res = await window.Accounts.sendIntro({
+      researcher_id: lastMatch.researcher_id,
+      subject: lastEmail.subject,
+      body: lastEmail.body,
+      paper_title: lastMatch.matched_work.title,
+    });
+    // null means the user was bounced to sign-up; the send resumes after auth
+    if (res) {
+      $("intro-modal").hidden = true;
+      toast(res.notice, 6000);
+    }
+  } catch (e) {
+    toast(e.message);
+  } finally {
+    btn.disabled = false;
   }
 };
 

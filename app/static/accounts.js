@@ -1,0 +1,467 @@
+/* Accounts, profiles, claiming, and the message inbox.
+
+   The one rule this file encodes: a researcher account never *creates* a
+   researcher. Every one of the 4,159 already exists from public data. Signing
+   up as a researcher means finding yourself and claiming what's there — which
+   is why the flow is a search box, not a profile form. */
+
+(() => {
+  const $ = (id) => document.getElementById(id);
+
+  const A = {
+    user: null,
+    box: "inbox",
+    messages: { inbox: [], sent: [] },
+    afterAuth: null,   // callback to resume whatever the user was doing
+  };
+  window.Accounts = A;
+
+  const esc = (s) => {
+    const d = document.createElement("div");
+    d.textContent = s ?? "";
+    return d.innerHTML;
+  };
+
+  const when = (ts) => {
+    if (!ts) return "";
+    const d = new Date(ts * 1000);
+    const days = (Date.now() - d) / 86400000;
+    return days < 1
+      ? d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })
+      : d.toLocaleDateString([], { month: "short", day: "numeric" });
+  };
+
+  async function api(path, opts = {}) {
+    const res = await fetch(path, {
+      headers: opts.body instanceof FormData ? {} : { "Content-Type": "application/json" },
+      ...opts,
+    });
+    const text = await res.text();
+    let data = null;
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = { detail: text };
+    }
+    if (!res.ok) throw new Error(data?.detail || `Request failed (${res.status})`);
+    return data;
+  }
+
+  /* ── session ─────────────────────────────────────── */
+
+  async function refresh() {
+    try {
+      const { user } = await api("/api/me");
+      A.user = user;
+    } catch {
+      A.user = null;
+    }
+    paintNav();
+    return A.user;
+  }
+
+  function paintNav() {
+    const btn = $("nav-account");
+    if (!btn) return;
+    if (!A.user) {
+      btn.textContent = "Sign in";
+      btn.classList.remove("has-unread");
+      return;
+    }
+    const first = A.user.name.split(/\s+/)[0];
+    btn.textContent = A.user.unread ? `${first} (${A.user.unread})` : first;
+    btn.classList.toggle("has-unread", A.user.unread > 0);
+    const badge = $("msg-badge");
+    if (badge) badge.textContent = String(A.user.unread || 0);
+  }
+
+  /* ── auth modal ──────────────────────────────────── */
+
+  let mode = "login";
+
+  function openAuth(nextMode = "login", after = null) {
+    mode = nextMode;
+    A.afterAuth = after;
+    setMode(mode);
+    $("auth-error").hidden = true;
+    $("auth-modal").hidden = false;
+    $("auth-email").focus();
+  }
+
+  function setMode(next) {
+    mode = next;
+    const signup = mode === "signup";
+    $("auth-title").textContent = signup ? "Create account" : "Sign in";
+    $("auth-submit").querySelector("span").textContent = signup ? "Create account" : "Sign in";
+    $("auth-name-field").hidden = !signup;
+    $("auth-roles").hidden = !signup;
+    $("auth-password").autocomplete = signup ? "new-password" : "current-password";
+    document.querySelectorAll(".auth-mode .seg-btn").forEach((b) =>
+      b.classList.toggle("is-on", b.dataset.mode === mode)
+    );
+  }
+
+  document.querySelectorAll(".auth-mode .seg-btn").forEach((b) => {
+    b.onclick = () => setMode(b.dataset.mode);
+  });
+  $("auth-close").onclick = () => ($("auth-modal").hidden = true);
+  $("auth-modal").addEventListener("click", (e) => {
+    if (e.target === $("auth-modal")) $("auth-modal").hidden = true;
+  });
+
+  $("auth-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const err = $("auth-error");
+    err.hidden = true;
+    const btn = $("auth-submit");
+    btn.disabled = true;
+
+    const email = $("auth-email").value.trim();
+    const password = $("auth-password").value;
+    const role = document.querySelector('input[name="role"]:checked')?.value || "founder";
+
+    try {
+      if (mode === "signup") {
+        A.user = await api("/api/auth/signup", {
+          method: "POST",
+          body: JSON.stringify({ email, password, name: $("auth-name").value.trim(), role }),
+        });
+      } else {
+        A.user = await api("/api/auth/login", {
+          method: "POST",
+          body: JSON.stringify({ email, password }),
+        });
+      }
+      $("auth-modal").hidden = true;
+      $("auth-password").value = "";
+      paintNav();
+      const after = A.afterAuth;
+      A.afterAuth = null;
+      if (after) after();
+      else openAccount();
+    } catch (ex) {
+      err.textContent = ex.message;
+      err.hidden = false;
+    } finally {
+      btn.disabled = false;
+    }
+  });
+
+  /* ── account view ────────────────────────────────── */
+
+  function openAccount() {
+    if (!A.user) return openAuth("login", openAccount);
+    window.showView("account-view");
+    $("account-title").textContent =
+      A.user.role === "founder" ? "Your profile" : "Your researcher profile";
+    A.user.role === "founder" ? paintFounder() : paintResearcher();
+  }
+
+  function paintFounder() {
+    const p = A.user.profile || {};
+    $("account-body").innerHTML = `
+      <div class="pane-inner">
+        <div class="acct-head">
+          <div>
+            <h2>${esc(A.user.name)}</h2>
+            <p class="acct-email">${esc(A.user.email)}</p>
+          </div>
+          <button class="ghost-btn" id="signout">Sign out</button>
+        </div>
+
+        <section class="card-block">
+          <h3>About you</h3>
+          <p class="block-note">Used to draft intro emails in your voice instead of "a Princeton undergraduate".</p>
+          <div class="profile-grid">
+            <label>Year<input id="p-year" value="${esc(p.year || "")}" placeholder="junior"></label>
+            <label>Major<input id="p-major" value="${esc(p.major || "")}" placeholder="Chemical & Biological Engineering"></label>
+            <label class="wide">What you're building<input id="p-project" value="${esc(p.project || "")}" placeholder="a low-cost water testing kit for rural clinics"></label>
+            <label class="wide">Short bio<textarea id="p-bio" rows="3" placeholder="Anything a professor should know in one line.">${esc(p.bio || "")}</textarea></label>
+          </div>
+          <div class="row-end">
+            <span class="save-state" id="save-state"></span>
+            <button class="btn-primary" id="save-profile"><span>Save profile</span></button>
+          </div>
+        </section>
+
+        <section class="card-block">
+          <h3>Resume</h3>
+          <p class="block-note">
+            PDF or plain text. We pull the text out and let the email drafter cite one real thing
+            from it — a course, a project — when it's genuinely relevant. It is never uploaded anywhere else.
+          </p>
+          <div class="resume-row">
+            <label class="file-btn">
+              <input type="file" id="resume-file" accept=".pdf,.txt,.md" hidden>
+              <span>Choose file</span>
+            </label>
+            <p class="resume-state" id="resume-state">${
+              p.resume_name
+                ? `<b>${esc(p.resume_name)}</b> — ${p.resume_chars.toLocaleString()} characters read`
+                : "No resume uploaded yet."
+            }</p>
+          </div>
+        </section>
+      </div>`;
+
+    $("signout").onclick = signOut;
+    $("save-profile").onclick = saveProfile;
+    $("resume-file").onchange = uploadResume;
+  }
+
+  async function saveProfile() {
+    const state = $("save-state");
+    state.textContent = "Saving…";
+    try {
+      A.user = await api("/api/profile", {
+        method: "PUT",
+        body: JSON.stringify({
+          year: $("p-year").value.trim(),
+          major: $("p-major").value.trim(),
+          project: $("p-project").value.trim(),
+          bio: $("p-bio").value.trim(),
+        }),
+      });
+      state.textContent = "Saved.";
+      setTimeout(() => (state.textContent = ""), 2200);
+    } catch (e) {
+      state.textContent = e.message;
+    }
+  }
+
+  async function uploadResume(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const state = $("resume-state");
+    state.textContent = "Reading…";
+    const fd = new FormData();
+    fd.append("file", file);
+    try {
+      const r = await api("/api/resume", { method: "POST", body: fd });
+      state.innerHTML = `<b>${esc(r.resume_name)}</b> — ${r.resume_chars.toLocaleString()} characters read`;
+      await refresh();
+    } catch (ex) {
+      state.textContent = ex.message;
+    }
+  }
+
+  /* ── researcher: claim, don't create ─────────────── */
+
+  function paintResearcher() {
+    const claim = A.user.claim;
+    $("account-body").innerHTML = `
+      <div class="pane-inner">
+        <div class="acct-head">
+          <div>
+            <h2>${esc(A.user.name)}</h2>
+            <p class="acct-email">${esc(A.user.email)}</p>
+          </div>
+          <button class="ghost-btn" id="signout">Sign out</button>
+        </div>
+
+        ${
+          claim
+            ? `<section class="card-block claimed">
+                 <p class="kicker">Claimed profile</p>
+                 <h3>${esc(claim.name || "")}</h3>
+                 <p class="block-note">${esc(claim.dept || "")} · ${claim.works} recent papers indexed</p>
+                 <label class="toggle-row">
+                   <input type="checkbox" id="accepting" ${claim.accepting ? "checked" : ""}>
+                   <span>Open to student intros right now</span>
+                 </label>
+                 <p class="block-note">
+                   Turning this off doesn't hide your published work — that was always public.
+                   It just tells students not to expect a reply.
+                 </p>
+               </section>`
+            : `<section class="card-block">
+                 <h3>Find yourself</h3>
+                 <p class="block-note">
+                   You already have a profile here. We built it from your public OpenAlex record
+                   before you ever visited — nothing to fill in. Search your name to claim it.
+                 </p>
+                 <input class="claim-search" id="claim-q" placeholder="Type your last name…" autocomplete="off">
+                 <div class="claim-results" id="claim-results"></div>
+               </section>`
+        }
+      </div>`;
+
+    $("signout").onclick = signOut;
+    if (claim) {
+      $("accepting").onchange = async (e) => {
+        A.user = await api("/api/claim/accepting", {
+          method: "PUT",
+          body: JSON.stringify({ accepting: e.target.checked }),
+        });
+      };
+    } else {
+      let timer;
+      $("claim-q").oninput = (e) => {
+        clearTimeout(timer);
+        timer = setTimeout(() => searchClaim(e.target.value), 220);
+      };
+    }
+  }
+
+  async function searchClaim(q) {
+    const box = $("claim-results");
+    if (q.trim().length < 2) return (box.innerHTML = "");
+    const { results } = await api(`/api/researchers/search?q=${encodeURIComponent(q)}`);
+    if (!results.length) {
+      box.innerHTML = `<p class="block-note">No match. Only researchers with 3+ papers since 2021 are indexed.</p>`;
+      return;
+    }
+    box.innerHTML = results
+      .map(
+        (r, i) => `
+        <div class="claim-item">
+          <div class="claim-main">
+            <b>${esc(r.name)}</b>
+            <span>${esc(r.dept || "")} · ${r.works} recent papers</span>
+            <em>${esc(r.recent[0] || "")}</em>
+            ${r.pending ? `<span class="pending-flag">${r.pending} message${r.pending > 1 ? "s" : ""} waiting</span>` : ""}
+          </div>
+          ${
+            r.claimed
+              ? `<span class="claimed-flag">Already claimed</span>`
+              : `<button class="btn-primary" data-claim="${esc(r.researcher_id)}"><span>This is me</span></button>`
+          }
+        </div>`
+      )
+      .join("");
+    box.querySelectorAll("[data-claim]").forEach((b) => {
+      b.onclick = async () => {
+        b.disabled = true;
+        try {
+          A.user = await api("/api/claim", {
+            method: "POST",
+            body: JSON.stringify({ researcher_id: b.dataset.claim }),
+          });
+          paintResearcher();
+          await refresh();
+        } catch (e) {
+          b.disabled = false;
+          alert(e.message);
+        }
+      };
+    });
+  }
+
+  async function signOut() {
+    await api("/api/auth/logout", { method: "POST" });
+    A.user = null;
+    paintNav();
+    window.showView("search-view");
+  }
+
+  /* ── messages ────────────────────────────────────── */
+
+  async function openMessages() {
+    if (!A.user) return openAuth("login", openMessages);
+    window.showView("messages-view");
+    A.messages = await api("/api/messages");
+    await refresh();
+    paintList();
+    $("msg-thread").innerHTML = `<p class="thread-empty">Pick a conversation.</p>`;
+  }
+
+  function paintList() {
+    const items = A.messages[A.box] || [];
+    const list = $("msg-list");
+    if (!items.length) {
+      list.innerHTML = `<p class="thread-empty">${
+        A.box === "inbox" ? "No messages yet." : "You haven't sent anything yet."
+      }</p>`;
+      return;
+    }
+    // one row per thread, newest first
+    const seen = new Set();
+    list.innerHTML = items
+      .filter((m) => !seen.has(m.thread_id) && seen.add(m.thread_id))
+      .map(
+        (m) => `
+        <button class="msg-item ${m.read_at || A.box === "sent" ? "" : "is-unread"}" data-thread="${m.thread_id}">
+          <span class="msg-who">${esc(
+            A.box === "inbox" ? m.from_name : m.to_name || "Not on ResearchBridge yet"
+          )}</span>
+          <span class="msg-subject">${esc(m.subject)}</span>
+          <span class="msg-preview">${esc((m.body || "").slice(0, 90))}</span>
+          <span class="msg-when">${when(m.created_at)}</span>
+        </button>`
+      )
+      .join("");
+    list.querySelectorAll("[data-thread]").forEach((b) => {
+      b.onclick = () => openThread(+b.dataset.thread);
+    });
+  }
+
+  async function openThread(tid) {
+    const { messages } = await api(`/api/messages/${tid}`);
+    $("msg-thread").innerHTML = `
+      <div class="thread-head"><h3>${esc(messages[0].subject)}</h3>
+        ${messages[0].paper_title ? `<p class="thread-paper">Re: ${esc(messages[0].paper_title)}</p>` : ""}
+      </div>
+      <div class="thread-msgs">
+        ${messages
+          .map(
+            (m) => `<div class="bubble ${m.from_user === A.user.id ? "mine" : ""}">
+              <p class="bubble-who">${esc(m.from_name)} · ${when(m.created_at)}</p>
+              <p class="bubble-body">${esc(m.body)}</p>
+            </div>`
+          )
+          .join("")}
+      </div>
+      <form class="reply-form" id="reply-form">
+        <textarea id="reply-body" rows="3" placeholder="Write a reply…"></textarea>
+        <button class="btn-primary" type="submit"><span>Send reply</span></button>
+      </form>`;
+    $("reply-form").onsubmit = async (e) => {
+      e.preventDefault();
+      const body = $("reply-body").value.trim();
+      if (!body) return;
+      await api("/api/messages", { method: "POST", body: JSON.stringify({ thread_id: tid, body }) });
+      A.messages = await api("/api/messages");
+      openThread(tid);
+      paintList();
+    };
+    A.messages = await api("/api/messages");
+    await refresh();
+    paintList();
+  }
+
+  document.querySelectorAll("#msg-tabs .seg-btn").forEach((b) => {
+    b.onclick = () => {
+      A.box = b.dataset.box;
+      document.querySelectorAll("#msg-tabs .seg-btn").forEach((x) =>
+        x.classList.toggle("is-on", x === b)
+      );
+      paintList();
+      $("msg-thread").innerHTML = `<p class="thread-empty">Pick a conversation.</p>`;
+    };
+  });
+
+  /* ── send an intro through the app ───────────────── */
+
+  A.sendIntro = async ({ researcher_id, subject, body, paper_title }) => {
+    if (!A.user) {
+      openAuth("signup", () => A.sendIntro({ researcher_id, subject, body, paper_title }));
+      return null;
+    }
+    return api("/api/messages", {
+      method: "POST",
+      body: JSON.stringify({ researcher_id, subject, body, paper_title }),
+    });
+  };
+
+  A.openAuth = openAuth;
+  A.openAccount = openAccount;
+  A.openMessages = openMessages;
+  A.refresh = refresh;
+
+  $("nav-account").onclick = () => (A.user ? openAccount() : openAuth("login"));
+  $("nav-messages").onclick = openMessages;
+  $("account-back").onclick = () => window.showView("search-view");
+  $("messages-back").onclick = () => openAccount();
+
+  refresh();
+})();

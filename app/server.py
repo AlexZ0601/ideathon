@@ -10,10 +10,11 @@ Usage:
 
 import hashlib
 import json
+import re
 import sys
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -21,8 +22,11 @@ from pydantic import BaseModel
 ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
+from api import auth as auth_mod  # noqa: E402
 from api import intro as intro_mod  # noqa: E402
 from api import match as match_mod  # noqa: E402
+from api import resume as resume_mod  # noqa: E402
+from api import store  # noqa: E402
 
 CACHE_DIR = ROOT / "data" / "cache"
 STATIC = Path(__file__).resolve().parent / "static"
@@ -92,6 +96,18 @@ def intro_cache_path(req: IntroRequest) -> Path:
     return CACHE_DIR / f"intro_{key}.json"
 
 
+def current_user(rb_session: str | None = Cookie(default=None)):
+    """Resolved user or None. Use require_user() when the route needs one."""
+    uid = auth_mod.read_token(rb_session)
+    return store.user_by_id(uid) if uid else None
+
+
+def require_user(user=Depends(current_user)):
+    if not user:
+        raise HTTPException(401, "Sign in first.")
+    return user
+
+
 @app.get("/api/scenarios")
 def scenarios():
     return {"scenarios": SCENARIOS}
@@ -123,21 +139,331 @@ def api_match(req: MatchRequest):
 
 
 @app.post("/api/intro")
-def api_intro(req: IntroRequest):
+def api_intro(req: IntroRequest, user=Depends(current_user)):
+    founder = req.founder.model_dump()
+    # a signed-in founder's saved profile beats whatever the anonymous form had
+    if user and user["role"] == "founder":
+        p = store.get_founder_profile(user["id"])
+        founder = {
+            "name": user["name"],
+            "year": p.get("year") or founder.get("year"),
+            "major": p.get("major") or founder.get("major"),
+            "project": p.get("project") or founder.get("project"),
+            "resume_text": p.get("resume_text"),
+        }
+
     path = intro_cache_path(req)
-    if path.exists() and not req.refresh:
+    # a resume makes the draft personal, so the shared cache no longer applies
+    use_cache = not founder.get("resume_text")
+    if use_cache and path.exists() and not req.refresh:
         with open(path) as f:
             return {"cached": True, **json.load(f)}
 
     researchers = intro_mod.load_researchers()
     researcher, work = intro_mod.find(researchers, req.researcher_id, req.work_id)
-    email = intro_mod.draft(researcher, work, req.problem, req.founder.model_dump())
+    email = intro_mod.draft(researcher, work, req.problem, founder)
 
     payload = {"researcher": researcher["name"], **email}
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(payload, f)
     return {"cached": False, **payload}
+
+
+# ── accounts ───────────────────────────────────────────
+
+def public_user(user):
+    """Everything the client may see about the signed-in account."""
+    out = {
+        "id": user["id"],
+        "email": user["email"],
+        "name": user["name"],
+        "role": user["role"],
+        "unread": store.unread_count(user["id"]),
+    }
+    if user["role"] == "founder":
+        p = store.get_founder_profile(user["id"])
+        out["profile"] = {
+            "year": p.get("year"),
+            "major": p.get("major"),
+            "project": p.get("project"),
+            "bio": p.get("bio"),
+            "resume_name": p.get("resume_name"),
+            # the parsed text can run to 20k chars; the client only needs to
+            # know whether it exists and roughly how much was read
+            "resume_chars": len(p.get("resume_text") or ""),
+        }
+    else:
+        claim = store.get_claim(user["id"])
+        out["claim"] = None
+        if claim:
+            r = match_mod.researcher_by_id(claim["researcher_id"])
+            out["claim"] = {
+                "researcher_id": claim["researcher_id"],
+                "accepting": bool(claim["accepting"]),
+                "note": claim["note"],
+                "name": (r or {}).get("name"),
+                "dept": (r or {}).get("dept"),
+                "works": len((r or {}).get("works") or []),
+            }
+    return out
+
+
+class SignupRequest(BaseModel):
+    email: str
+    password: str
+    name: str
+    role: str = "founder"
+
+
+class LoginRequest(BaseModel):
+    email: str
+    password: str
+
+
+def _set_session(response: Response, user_id: int):
+    response.set_cookie(
+        auth_mod.COOKIE_NAME,
+        auth_mod.issue_token(user_id),
+        max_age=auth_mod.SESSION_TTL,
+        httponly=True,
+        samesite="lax",
+    )
+
+
+@app.post("/api/auth/signup")
+def api_signup(req: SignupRequest, response: Response):
+    if req.role not in ("founder", "researcher"):
+        raise HTTPException(400, "role must be founder or researcher")
+    for problem in (auth_mod.email_problem(req.email), auth_mod.password_problem(req.password)):
+        if problem:
+            raise HTTPException(400, problem)
+    if not req.name.strip():
+        raise HTTPException(400, "Enter your name.")
+    if store.user_by_email(req.email):
+        raise HTTPException(409, "An account with that email already exists.")
+
+    uid = store.create_user(
+        req.email, auth_mod.hash_password(req.password), req.role, req.name
+    )
+    _set_session(response, uid)
+    return public_user(store.user_by_id(uid))
+
+
+@app.post("/api/auth/login")
+def api_login(req: LoginRequest, response: Response):
+    user = store.user_by_email(req.email)
+    # same message either way: don't leak which emails have accounts
+    if not user or not auth_mod.verify_password(req.password, user["pw_hash"]):
+        raise HTTPException(401, "Email or password is incorrect.")
+    _set_session(response, user["id"])
+    return public_user(user)
+
+
+@app.post("/api/auth/logout")
+def api_logout(response: Response):
+    response.delete_cookie(auth_mod.COOKIE_NAME)
+    return {"ok": True}
+
+
+@app.get("/api/me")
+def api_me(user=Depends(current_user)):
+    return {"user": public_user(user) if user else None}
+
+
+class ProfileRequest(BaseModel):
+    year: str | None = None
+    major: str | None = None
+    project: str | None = None
+    bio: str | None = None
+
+
+@app.put("/api/profile")
+def api_profile(req: ProfileRequest, user=Depends(require_user)):
+    if user["role"] != "founder":
+        raise HTTPException(403, "Only founder accounts have this profile.")
+    store.upsert_founder_profile(user["id"], **req.model_dump(exclude_none=True))
+    return public_user(store.user_by_id(user["id"]))
+
+
+@app.post("/api/resume")
+async def api_resume(file: UploadFile = File(...), user=Depends(require_user)):
+    if user["role"] != "founder":
+        raise HTTPException(403, "Only founder accounts can upload a resume.")
+    try:
+        text = resume_mod.extract(file.filename, await file.read())
+    except resume_mod.ResumeError as e:
+        raise HTTPException(400, str(e))
+    store.set_resume(user["id"], file.filename, text)
+    return {"resume_name": file.filename, "resume_chars": len(text), "excerpt": text[:400]}
+
+
+# ── researcher claim ───────────────────────────────────
+
+_TAG_RE = re.compile(r"<[^>]+>")
+
+
+def strip_tags(s):
+    """OpenAlex titles carry markup like <i>Ab Initio</i>."""
+    return _TAG_RE.sub("", s or "")
+
+@app.get("/api/researchers/search")
+def api_researcher_search(q: str, limit: int = 8):
+    """Name search so a professor can find the profile that already exists."""
+    if len(q.strip()) < 2:
+        return {"results": []}
+    needle = q.strip().lower()
+
+    def rank(name):
+        """Lower is better. A plain substring test puts 'Annabella Selloni'
+        ahead of 'A. Bell' for the query 'Bell', which is useless to someone
+        trying to find themselves."""
+        low = (name or "").lower()
+        words = low.replace(".", " ").replace("-", " ").split()
+        if low == needle:
+            return 0
+        if needle in words:
+            return 1
+        if any(w.startswith(needle) for w in words):
+            return 2
+        if needle in low:
+            return 4
+        return None
+
+    scored = []
+    for r in match_mod.load_index()["researchers"]:
+        score = rank(r["name"])
+        if score is not None:
+            scored.append((score, -r["works_count_recent"], r))
+    scored.sort(key=lambda t: (t[0], t[1]))
+
+    out = []
+    for _, _, r in scored[:limit]:
+        owner = store.claim_owner(r["id"])
+        out.append(
+            {
+                "researcher_id": r["id"],
+                "name": r["name"],
+                "dept": r["dept"],
+                "works": r["works_count_recent"],
+                "recent": [strip_tags(w["title"])[:120] for w in r["works"][:3]],
+                "claimed": bool(owner),
+                "pending": store.pending_for_researcher(r["id"]),
+            }
+        )
+    return {"results": out}
+
+
+class ClaimRequest(BaseModel):
+    researcher_id: str
+
+
+@app.post("/api/claim")
+def api_claim(req: ClaimRequest, user=Depends(require_user)):
+    if user["role"] != "researcher":
+        raise HTTPException(403, "Only researcher accounts can claim a profile.")
+    if store.get_claim(user["id"]):
+        raise HTTPException(409, "This account has already claimed a profile.")
+    if store.claim_owner(req.researcher_id):
+        raise HTTPException(409, "Someone has already claimed that profile.")
+    if not match_mod.researcher_by_id(req.researcher_id):
+        raise HTTPException(404, "No researcher with that id.")
+    store.create_claim(user["id"], req.researcher_id)
+    return public_user(store.user_by_id(user["id"]))
+
+
+class AcceptingRequest(BaseModel):
+    accepting: bool
+    note: str | None = None
+
+
+@app.put("/api/claim/accepting")
+def api_accepting(req: AcceptingRequest, user=Depends(require_user)):
+    if not store.get_claim(user["id"]):
+        raise HTTPException(404, "Claim a profile first.")
+    store.set_accepting(user["id"], req.accepting, req.note)
+    return public_user(store.user_by_id(user["id"]))
+
+
+# ── messages ───────────────────────────────────────────
+
+class MessageRequest(BaseModel):
+    researcher_id: str | None = None
+    thread_id: int | None = None
+    subject: str | None = None
+    body: str
+    paper_title: str | None = None
+
+
+@app.post("/api/messages")
+def api_send(req: MessageRequest, user=Depends(require_user)):
+    if not req.body.strip():
+        raise HTTPException(400, "Message body is empty.")
+
+    if req.thread_id:
+        existing = store.thread(req.thread_id, user["id"])
+        if not existing:
+            raise HTTPException(404, "No such thread.")
+        first = existing[0]
+        # reply goes to whoever on the thread isn't you
+        other = first["to_user"] if first["from_user"] == user["id"] else first["from_user"]
+        store.send_message(
+            user["id"],
+            req.subject or f"Re: {first['subject']}",
+            req.body,
+            to_user=other,
+            to_researcher=None if other else first["to_researcher"],
+            thread_id=req.thread_id,
+        )
+        return {"ok": True, "thread_id": req.thread_id}
+
+    if not req.researcher_id:
+        raise HTTPException(400, "researcher_id or thread_id is required.")
+    researcher = match_mod.researcher_by_id(req.researcher_id)
+    if not researcher:
+        raise HTTPException(404, "No researcher with that id.")
+
+    owner = store.claim_owner(req.researcher_id)
+    mid = store.send_message(
+        user["id"],
+        req.subject or "Intro",
+        req.body,
+        to_user=owner["id"] if owner else None,
+        to_researcher=None if owner else req.researcher_id,
+        paper_title=req.paper_title,
+    )
+    return {
+        "ok": True,
+        "thread_id": mid,
+        "delivered_in_app": bool(owner),
+        "researcher_name": researcher["name"],
+        # the honest bit: most researchers have not claimed a profile, so this
+        # is a draft the founder still has to send by email
+        "notice": (
+            f"{researcher['name']} is on ResearchBridge — they'll see this in their inbox."
+            if owner
+            else f"{researcher['name']} hasn't claimed their profile yet. This is saved in "
+            "your sent folder; copy it into an email to actually reach them."
+        ),
+    }
+
+
+@app.get("/api/messages")
+def api_messages(user=Depends(require_user)):
+    return {
+        "inbox": store.inbox(user["id"]),
+        "sent": store.sent(user["id"]),
+        "unread": store.unread_count(user["id"]),
+    }
+
+
+@app.get("/api/messages/{thread_id}")
+def api_thread(thread_id: int, user=Depends(require_user)):
+    msgs = store.thread(thread_id, user["id"])
+    if msgs is None:
+        raise HTTPException(404, "No such thread.")
+    store.mark_read(thread_id, user["id"])
+    return {"messages": msgs}
 
 
 @app.get("/api/whitespace")

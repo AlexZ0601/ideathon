@@ -51,6 +51,15 @@ def load_index():
     }
 
 
+@lru_cache(maxsize=1)
+def _by_id():
+    return {r["id"]: r for r in load_index()["researchers"]}
+
+
+def researcher_by_id(researcher_id):
+    return _by_id().get(researcher_id)
+
+
 def embed_query(text):
     from openai import OpenAI
 

@@ -23,6 +23,7 @@
       <a href="#map">White space</a>
       <a href="#limits">Limitations</a>
       <button class="nav-cta" id="open-map">White Space Map</button>
+      <button class="nav-account" id="nav-account">Sign in</button>
     </div>
   </nav>
 
@@ -260,6 +261,86 @@
   <article class="ws-detail" id="ws-detail" hidden></article>
 </section>
 
+<!-- ── Account ────────────────────────────────────────────── -->
+<section id="account-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="account-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <p class="topbar-problem" id="account-title">Your profile</p>
+    <button class="shortlist-btn" id="nav-messages">Messages <span class="badge" id="msg-badge">0</span></button>
+  </header>
+  <div class="pane" id="account-body"></div>
+</section>
+
+<!-- ── Messages ───────────────────────────────────────────── -->
+<section id="messages-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="messages-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <p class="topbar-problem">Messages</p>
+    <div class="seg" id="msg-tabs">
+      <button class="seg-btn is-on" data-box="inbox">Inbox</button>
+      <button class="seg-btn" data-box="sent">Sent</button>
+    </div>
+  </header>
+  <div class="msg-body">
+    <div class="msg-list" id="msg-list"></div>
+    <div class="msg-thread" id="msg-thread"></div>
+  </div>
+</section>
+
+<!-- ── Auth modal ─────────────────────────────────────────── -->
+<div class="modal-backdrop" id="auth-modal" hidden>
+  <div class="modal auth-modal" role="dialog" aria-modal="true" aria-labelledby="auth-title">
+    <header class="modal-head">
+      <h2 id="auth-title">Sign in</h2>
+      <button class="icon-btn" id="auth-close" aria-label="Close">
+        <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </header>
+    <form class="modal-body auth-form" id="auth-form" autocomplete="on">
+      <div class="seg auth-mode">
+        <button type="button" class="seg-btn is-on" data-mode="login">Sign in</button>
+        <button type="button" class="seg-btn" data-mode="signup">Create account</button>
+      </div>
+
+      <div class="auth-roles" id="auth-roles" hidden>
+        <label class="role-card">
+          <input type="radio" name="role" value="founder" checked>
+          <b>I'm a student</b>
+          <span>Find researchers who can solve your problem.</span>
+        </label>
+        <label class="role-card">
+          <input type="radio" name="role" value="researcher">
+          <b>I'm a researcher</b>
+          <span>Claim the profile we already built from your published work.</span>
+        </label>
+      </div>
+
+      <label class="field" id="auth-name-field" hidden>Name
+        <input type="text" id="auth-name" autocomplete="name" placeholder="Alex Zeng">
+      </label>
+      <label class="field">Email
+        <input type="email" id="auth-email" autocomplete="email" required placeholder="you@princeton.edu">
+      </label>
+      <label class="field">Password
+        <input type="password" id="auth-password" autocomplete="current-password" required placeholder="at least 8 characters">
+      </label>
+
+      <p class="auth-error" id="auth-error" hidden></p>
+      <button type="submit" class="btn-primary auth-submit" id="auth-submit">
+        <span>Sign in</span>
+      </button>
+      <p class="disclose auth-note">
+        Demo-grade accounts: passwords are hashed (PBKDF2) and sessions are signed, but there's
+        no email verification or password reset. Don't reuse a real password.
+      </p>
+    </form>
+  </div>
+</div>
+
 <!-- ── Intro modal ────────────────────────────────────────── -->
 <div class="modal-backdrop" id="intro-modal" hidden>
   <div class="modal" role="dialog" aria-modal="true" aria-labelledby="intro-title">
@@ -272,7 +353,8 @@
     <div class="modal-body" id="intro-body"></div>
     <footer class="modal-foot">
       <p class="disclose" id="intro-hint"></p>
-      <button class="btn-primary" id="copy-btn">Copy email</button>
+      <button class="ghost-btn" id="copy-btn">Copy</button>
+      <button class="btn-primary" id="send-btn"><span>Send via ResearchBridge</span></button>
     </footer>
   </div>
 </div>
@@ -280,6 +362,7 @@
 <div class="toast" id="toast" hidden></div>
 
 <script src="/static/whitespace.js"></script>
+<script src="/static/accounts.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
