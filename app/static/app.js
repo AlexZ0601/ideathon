@@ -158,6 +158,8 @@ function attachDrag(el, match) {
 
   const onDown = (e) => {
     dragging = true;
+    // tells the hover-tilt in motion.js to keep its hands off `transform`
+    el.dataset.dragging = "1";
     startX = e.clientX;
     startY = e.clientY;
     el.setPointerCapture(e.pointerId);
@@ -177,6 +179,7 @@ function attachDrag(el, match) {
   const onUp = () => {
     if (!dragging) return;
     dragging = false;
+    delete el.dataset.dragging;
     if (Math.abs(dx) > THROW) {
       commit(el, match, dx > 0 ? "keep" : "pass");
     } else {
@@ -401,6 +404,9 @@ const openMap = () => {
 };
 $("open-map").onclick = openMap;
 $("open-map-2").onclick = openMap;
+$("open-hub").onclick = () => window.Hub.open();
+// hub.js needs the toast without importing this module
+window.toastMsg = toast;
 $("ws-back").onclick = () => show("search-view");
 
 loadScenarios();

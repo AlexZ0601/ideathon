@@ -20,6 +20,7 @@
     uniform float uTime;
     uniform vec3  uC1, uC2, uC3, uBg;
     uniform float uStrength;
+    uniform vec2  uMouse;
 
     // value noise + fBm. Cheap, and at this blur nobody can tell it from simplex.
     float hash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -56,16 +57,27 @@
 
       // fBm averages ~0.48, so a window starting above that leaves most of the
       // field dark and the effect invisible. This one straddles the mean.
-      float mask = smoothstep(0.20, 0.78, f) * uStrength;
+      float mask = smoothstep(0.12, 0.72, f) * uStrength;
 
-      // Pool the colour into the corners. The hero text is left-aligned in the
-      // upper half, and a bright field behind it costs more contrast than the
-      // effect is worth — so the light lives where the copy isn't.
-      float glowA = smoothstep(1.15, 0.05, distance(uv, vec2(0.93, 0.86)));
-      float glowB = smoothstep(1.05, 0.10, distance(uv, vec2(0.06, 0.06))) * 0.7;
-      mask *= clamp(glowA + glowB, 0.0, 1.0);
+      // Aurora bands: the warp field sliced into ridges. This is what reads as
+      // motion from across a room — a smooth blob does not.
+      float band = abs(sin((r.x + r.y) * 3.4 + uTime * 0.22));
+      mask *= 0.55 + 0.45 * (1.0 - band);
 
-      gl_FragColor = vec4(mix(uBg, col, mask), 1.0);
+      // Light pools away from the hero copy (upper-left) so contrast survives.
+      float glowA = smoothstep(1.25, 0.02, distance(uv, vec2(0.88, 0.82)));
+      float glowB = smoothstep(1.10, 0.06, distance(uv, vec2(0.04, 0.10))) * 0.8;
+
+      // The cursor drags a soft light with it. Cheap, and it makes the page
+      // feel responsive before the user has clicked anything.
+      float glowM = smoothstep(0.5, 0.0, distance(uv, uMouse)) * 0.6;
+
+      mask *= clamp(glowA + glowB + glowM, 0.0, 1.0);
+
+      vec3 outc = mix(uBg, col, clamp(mask, 0.0, 1.0));
+      // vignette keeps the eye in the middle where the content is
+      outc *= 1.0 - 0.22 * smoothstep(0.55, 1.25, distance(uv, vec2(0.5)));
+      gl_FragColor = vec4(outc, 1.0);
     }`;
 
   const canvas = document.createElement("canvas");
@@ -104,8 +116,20 @@
   gl.vertexAttribPointer(loc, 2, gl.FLOAT, false, 0, 0);
 
   const U = {};
-  ["uRes", "uTime", "uC1", "uC2", "uC3", "uBg", "uStrength"].forEach(
+  ["uRes", "uTime", "uC1", "uC2", "uC3", "uBg", "uStrength", "uMouse"].forEach(
     (n) => (U[n] = gl.getUniformLocation(prog, n))
+  );
+
+  // eased toward the pointer so the light trails rather than snapping
+  const mouse = { x: 0.85, y: 0.8, tx: 0.85, ty: 0.8 };
+  addEventListener(
+    "pointermove",
+    (e) => {
+      mouse.tx = e.clientX / innerWidth;
+      mouse.ty = 1 - e.clientY / innerHeight;  // GL origin is bottom-left
+      kick();
+    },
+    { passive: true }
   );
 
   /* ── theme colours, read from the stylesheet ─────── */
@@ -139,7 +163,9 @@
     gl.uniform3fv(U.uC2, dark ? [0.29, 0.36, 0.85] : [0.42, 0.52, 0.95]);
     gl.uniform3fv(U.uC3, dark ? [0.85, 0.25, 0.42] : [0.96, 0.55, 0.35]);
     // light mode washes out fast, so it gets a lighter touch
-    strength = dark ? 0.9 : 0.4;
+    // Tuned down hard after the transparent-body fix: with nothing muting it,
+    // 1.55 turned the page into a magenta wash you couldn't read over.
+    strength = dark ? 0.42 : 0.22;
     gl.uniform1f(U.uStrength, strength);
   }
 
@@ -166,8 +192,11 @@
   function frame(now) {
     raf = null;
     resize();
+    mouse.x += (mouse.tx - mouse.x) * 0.06;
+    mouse.y += (mouse.ty - mouse.y) * 0.06;
     gl.useProgram(prog);
     gl.uniform1f(U.uTime, (now - t0) / 1000);
+    gl.uniform2f(U.uMouse, mouse.x, mouse.y);
     gl.drawArrays(gl.TRIANGLES, 0, 3);
     if (!reduced.matches && !document.hidden) raf = requestAnimationFrame(frame);
   }

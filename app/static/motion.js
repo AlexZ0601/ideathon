@@ -171,7 +171,67 @@
     io.observe(strip);
   }
 
+  /* ── cursor spotlight ────────────────────────────── */
+
+  // One delegated listener rather than per-element: the deck rebuilds its
+  // cards on every swipe, and re-binding each time leaks handlers.
+  const SPOT = ".step, .ws-cluster-item, .sl-item, .card-block, .claim-item, .msg-item";
+
+  function spotlight() {
+    if (reduced) return;
+    document.addEventListener(
+      "pointermove",
+      (e) => {
+        const el = e.target.closest?.(SPOT);
+        if (!el) return;
+        if (!el.classList.contains("spotlight")) el.classList.add("spotlight");
+        const r = el.getBoundingClientRect();
+        el.style.setProperty("--mx", `${e.clientX - r.left}px`);
+        el.style.setProperty("--my", `${e.clientY - r.top}px`);
+      },
+      { passive: true }
+    );
+  }
+
+  /* ── swipe-card tilt ─────────────────────────────── */
+
+  // Parallax tilt on the top card. Only touches cards that aren't mid-drag,
+  // since the drag handler owns `transform` while a swipe is in flight.
+  function cardTilt() {
+    if (reduced) return;
+    const deck = document.getElementById("deck");
+    if (!deck) return;
+
+    deck.addEventListener(
+      "pointermove",
+      (e) => {
+        const card = deck.lastElementChild;
+        if (!card || !card.classList.contains("card") || card.dataset.dragging) return;
+        const r = card.getBoundingClientRect();
+        const dx = (e.clientX - r.left) / r.width - 0.5;
+        const dy = (e.clientY - r.top) / r.height - 0.5;
+        card.style.transform =
+          `perspective(1000px) rotateY(${dx * 9}deg) rotateX(${-dy * 9}deg) translateZ(6px)`;
+        card.style.setProperty("--mx", `${e.clientX - r.left}px`);
+        card.style.setProperty("--my", `${e.clientY - r.top}px`);
+        card.classList.add("spotlight");
+      },
+      { passive: true }
+    );
+
+    deck.addEventListener("pointerleave", () => {
+      const card = deck.lastElementChild;
+      if (card && card.classList.contains("card") && !card.dataset.dragging) {
+        card.style.transform = "";
+      }
+    });
+  }
+
   document.readyState === "loading"
-    ? addEventListener("DOMContentLoaded", start)
-    : start();
+    ? addEventListener("DOMContentLoaded", () => {
+        start();
+        spotlight();
+        cardTilt();
+      })
+    : (start(), spotlight(), cardTilt());
 })();

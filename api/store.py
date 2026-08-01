@@ -91,6 +91,12 @@ LATER_COLUMNS = [
     ("users", "identity", "TEXT"),
     ("users", "seeking", "TEXT"),        # JSON array
     ("users", "accepted_terms", "REAL"),
+    # Cofounder hub. On founder_profiles rather than users so a researcher
+    # account claiming a public profile never grows a school field it didn't
+    # ask for.
+    ("founder_profiles", "school", "TEXT"),
+    ("founder_profiles", "org", "TEXT"),
+    ("founder_profiles", "looking", "INTEGER"),   # visible in the hub at all
 ]
 
 
@@ -192,6 +198,71 @@ def members(exclude_uid=None, identity=None, limit=50):
     return out
 
 
+def hub_search(q=None, school=None, org=None, exclude_uid=None, limit=60):
+    """The cofounder hub.
+
+    Unlike researcher search, this only sees people who actually signed up and
+    opted in — `looking` defaults to on for founder accounts, but anyone can
+    switch it off and disappear from here without deleting anything.
+    """
+    where = ["COALESCE(p.looking, 1) = 1"]
+    args = []
+
+    if exclude_uid:
+        where.append("u.id != ?")
+        args.append(exclude_uid)
+    if school:
+        where.append("p.school LIKE ?")
+        args.append(f"%{school.strip()}%")
+    if org:
+        where.append("p.org LIKE ?")
+        args.append(f"%{org.strip()}%")
+    if q:
+        # one box that searches the things a person would actually type
+        fields = ["u.name", "p.school", "p.org", "p.major", "p.project", "p.bio"]
+        where.append("(" + " OR ".join(f"{f} LIKE ?" for f in fields) + ")")
+        args.extend([f"%{q.strip()}%"] * len(fields))
+
+    sql = (
+        "SELECT u.id, u.name, u.identity, u.seeking, u.created_at, "
+        "       p.school, p.org, p.major, p.year, p.project, p.bio "
+        "FROM users u JOIN founder_profiles p ON p.user_id = u.id "
+        f"WHERE {' AND '.join(where)} "
+        "ORDER BY u.created_at DESC LIMIT ?"
+    )
+    args.append(limit)
+
+    out = []
+    for r in db().execute(sql, args).fetchall():
+        d = row_to_dict(r)
+        d["seeking"] = get_seeking(d)
+        d["blurb"] = d.pop("project") or d.pop("bio") or ""
+        out.append(d)
+    return out
+
+
+def hub_facets():
+    """Distinct schools and orgs, for the filter chips."""
+    rows = db().execute(
+        "SELECT school, org, COUNT(*) AS n FROM founder_profiles "
+        "WHERE COALESCE(looking, 1) = 1 GROUP BY school, org"
+    ).fetchall()
+    schools, orgs = {}, {}
+    for r in rows:
+        if r["school"]:
+            schools[r["school"]] = schools.get(r["school"], 0) + r["n"]
+        if r["org"]:
+            orgs[r["org"]] = orgs.get(r["org"], 0) + r["n"]
+    return {
+        "schools": sorted(
+            ({"name": k, "count": v} for k, v in schools.items()), key=lambda x: -x["count"]
+        ),
+        "orgs": sorted(
+            ({"name": k, "count": v} for k, v in orgs.items()), key=lambda x: -x["count"]
+        ),
+    }
+
+
 # ── founder profile ────────────────────────────────────
 
 def get_founder_profile(uid):
@@ -201,7 +272,7 @@ def get_founder_profile(uid):
 
 
 def upsert_founder_profile(uid, **fields):
-    allowed = {"year", "major", "project", "bio"}
+    allowed = {"year", "major", "project", "bio", "school", "org", "looking"}
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:
         return

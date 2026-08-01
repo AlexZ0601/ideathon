@@ -248,7 +248,17 @@
             <label>Major<input id="p-major" value="${esc(p.major || "")}" placeholder="Chemical & Biological Engineering"></label>
             <label class="wide">What you're building<input id="p-project" value="${esc(p.project || "")}" placeholder="a low-cost water testing kit for rural clinics"></label>
             <label class="wide">Short bio<textarea id="p-bio" rows="3" placeholder="Anything a professor should know in one line.">${esc(p.bio || "")}</textarea></label>
+            <label>School<input id="p-school" value="${esc(p.school || "")}" placeholder="Princeton University"></label>
+            <label>Student org<input id="p-org" value="${esc(p.org || "")}" placeholder="Princeton Student Ventures"></label>
           </div>
+          <label class="toggle-row">
+            <input type="checkbox" id="p-looking" ${p.looking === 0 ? "" : "checked"}>
+            <span>List me in the Cofounder Hub</span>
+          </label>
+          <p class="block-note" style="margin:0">
+            Your name, school, org, and what you're building become visible to other
+            signed-in members. Your email and resume never are.
+          </p>
           <div class="row-end">
             <span class="save-state" id="save-state"></span>
             <button class="btn-primary" id="save-profile"><span>Save profile</span></button>
@@ -291,6 +301,9 @@
           major: $("p-major").value.trim(),
           project: $("p-project").value.trim(),
           bio: $("p-bio").value.trim(),
+          school: $("p-school").value.trim(),
+          org: $("p-org").value.trim(),
+          looking: $("p-looking").checked,
         }),
       });
       state.textContent = "Saved.";

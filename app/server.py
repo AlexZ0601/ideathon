@@ -198,6 +198,9 @@ def public_user(user):
             "major": p.get("major"),
             "project": p.get("project"),
             "bio": p.get("bio"),
+            "school": p.get("school"),
+            "org": p.get("org"),
+            "looking": p.get("looking"),
             "resume_name": p.get("resume_name"),
             # the parsed text can run to 20k chars; the client only needs to
             # know whether it exists and roughly how much was read
@@ -317,14 +320,46 @@ class ProfileRequest(BaseModel):
     major: str | None = None
     project: str | None = None
     bio: str | None = None
+    school: str | None = None
+    org: str | None = None
+    looking: bool | None = None
 
 
 @app.put("/api/profile")
 def api_profile(req: ProfileRequest, user=Depends(require_user)):
     if user["role"] != "founder":
         raise HTTPException(403, "Only founder accounts have this profile.")
-    store.upsert_founder_profile(user["id"], **req.model_dump(exclude_none=True))
+    fields = req.model_dump(exclude_none=True)
+    if "looking" in fields:
+        fields["looking"] = 1 if fields["looking"] else 0
+    store.upsert_founder_profile(user["id"], **fields)
     return public_user(store.user_by_id(user["id"]))
+
+
+# ── cofounder hub ──────────────────────────────────────
+
+@app.get("/api/hub")
+def api_hub(
+    q: str | None = None,
+    school: str | None = None,
+    org: str | None = None,
+    user=Depends(current_user),
+):
+    """Search people who signed up and left themselves visible.
+
+    Deliberately not the researcher index: those 4,159 never consented to being
+    contacted as potential cofounders. This side is opt-in only, which is why
+    it starts empty and the UI says so instead of padding it out.
+    """
+    people = store.hub_search(
+        q=q, school=school, org=org, exclude_uid=user["id"] if user else None
+    )
+    return {
+        "people": people,
+        "facets": store.hub_facets(),
+        "signed_in": bool(user),
+        "total": len(people),
+    }
 
 
 @app.post("/api/resume")
@@ -489,6 +524,7 @@ def api_accepting(req: AcceptingRequest, user=Depends(require_user)):
 
 class MessageRequest(BaseModel):
     researcher_id: str | None = None
+    to_user_id: int | None = None     # cofounder hub: message another member
     thread_id: int | None = None
     subject: str | None = None
     body: str
@@ -516,6 +552,23 @@ def api_send(req: MessageRequest, user=Depends(require_user)):
             thread_id=req.thread_id,
         )
         return {"ok": True, "thread_id": req.thread_id}
+
+    if req.to_user_id:
+        target = store.user_by_id(req.to_user_id)
+        if not target:
+            raise HTTPException(404, "No such member.")
+        if target["id"] == user["id"]:
+            raise HTTPException(400, "That's you.")
+        mid = store.send_message(
+            user["id"], req.subject or "Intro", req.body, to_user=target["id"]
+        )
+        return {
+            "ok": True,
+            "thread_id": mid,
+            "delivered_in_app": True,
+            "researcher_name": target["name"],
+            "notice": f"Sent to {target['name']} — it's in their cofoundr inbox.",
+        }
 
     if not req.researcher_id:
         raise HTTPException(400, "researcher_id or thread_id is required.")

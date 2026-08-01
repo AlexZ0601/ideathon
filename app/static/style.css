@@ -148,6 +148,11 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   width: 26px; height: 26px; flex: none;
   overflow: visible;
   filter: drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 42%, transparent));
+  transition: transform .5s var(--ease), filter .5s var(--ease);
+}
+.brand:hover .brand-mark {
+  transform: rotate(-14deg) scale(1.14);
+  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 70%, transparent));
 }
 .brand-mark .cf-ring {
   fill: none;
@@ -169,8 +174,46 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   letter-spacing: -.02em;
   margin: 0 0 20px;
 }
-.hero em { font-style: italic; color: var(--accent); }
+/* Flowing gradient fill. The background is oversized and slid across, which
+   is what makes the colour travel through the glyphs instead of just cycling. */
+.hero em, .count {
+  background: linear-gradient(100deg, #ff9d3d, #ff3d68 28%, #7b5cff 52%, #21b8ff 72%, #ff9d3d);
+  background-size: 320% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: flow 11s linear infinite;
+}
+.hero em { font-style: italic; }
 .count { font-variant-numeric: tabular-nums; }
+
+@keyframes flow { to { background-position: 320% 0; } }
+
+/* Staggered entrance for the hero stack. */
+.search-inner > * { animation: rise-in .8s var(--ease) both; }
+.search-inner > .eyebrow      { animation-delay: .04s; }
+.search-inner > .hero         { animation-delay: .12s; }
+.search-inner > .hero-sub     { animation-delay: .22s; }
+.search-inner > .search-box   { animation-delay: .32s; }
+.search-inner > .chips        { animation-delay: .40s; }
+.search-inner > .profile      { animation-delay: .46s; }
+.search-inner > .stats        { animation-delay: .52s; }
+
+@keyframes rise-in {
+  from { opacity: 0; transform: translateY(20px); filter: blur(6px); }
+  to   { opacity: 1; transform: none; filter: none; }
+}
+
+/* Cursor spotlight. --mx/--my are written by motion.js on hover. */
+.spotlight { position: relative; isolation: isolate; }
+.spotlight::before {
+  content: ""; position: absolute; inset: 0; z-index: -1;
+  border-radius: inherit; pointer-events: none;
+  opacity: 0; transition: opacity .3s var(--ease);
+  background: radial-gradient(220px circle at var(--mx, 50%) var(--my, 50%),
+              color-mix(in srgb, var(--accent) 26%, transparent), transparent 70%);
+}
+.spotlight:hover::before { opacity: 1; }
 
 .hero-sub {
   color: var(--text-dim);
@@ -972,8 +1015,10 @@ kbd {
   width: 100%; height: 100%;
   display: block; pointer-events: none;
 }
-/* the shader paints its own bg colour, so the body gradients would double up */
-body:has(#gradient-bg) { background-image: none; }
+/* The shader paints its own background colour. Body must get out of the way
+   entirely — its opaque fill was muting the whole effect. html keeps the solid
+   colour underneath as the no-WebGL fallback. */
+body:has(#gradient-bg) { background-image: none; background-color: transparent; }
 
 .theme-toggle {
   flex: none;
@@ -1039,6 +1084,62 @@ body:has(#gradient-bg) { background-image: none; }
   #constellation { display: none; }
   .reveal { opacity: 1; transform: none; }
   .brand-mark .cf-lens { animation: none; }
+}
+
+/* ── cofounder hub ─────────────────────────────────── */
+
+.hub-body { flex: 1; overflow-y: auto; }
+.hub-controls {
+  width: min(880px, calc(100% - 44px));
+  margin: 0 auto; padding: 24px 0 6px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.hub-facets { display: flex; flex-direction: column; gap: 9px; }
+.facet-row { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.facet-label {
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .1em;
+  text-transform: uppercase; color: var(--text-faint);
+  margin-right: 4px; min-width: 78px;
+}
+.pill-n { color: var(--text-faint); font-size: 11px; margin-left: 3px; }
+.pill.is-on .pill-n { color: inherit; opacity: .75; }
+
+.hub-list {
+  width: min(880px, calc(100% - 44px));
+  margin: 0 auto; padding: 16px 0 60px;
+  display: flex; flex-direction: column; gap: 12px;
+}
+.hub-card {
+  display: flex; align-items: flex-start; gap: 20px;
+  background: color-mix(in srgb, var(--bg-elev) 76%, transparent);
+  backdrop-filter: blur(18px) saturate(160%);
+  -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 20px 22px;
+  animation: rise .35s var(--ease) both;
+  transition: border-color .2s, transform .2s var(--ease);
+}
+.hub-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.hub-card-main { flex: 1; min-width: 0; }
+.hub-card h3 { font-family: var(--serif); font-weight: 400; font-size: 21px; margin: 0 0 8px; }
+.hub-meta { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 10px; }
+.hub-tag {
+  font-size: 11.5px; color: var(--text-dim);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-radius: 7px; padding: 4px 9px;
+}
+.hub-tag.school { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.hub-tag.org { color: var(--keep); border-color: var(--keep-soft); background: var(--keep-soft); }
+.hub-blurb { margin: 0; color: var(--text-dim); font-size: 14px; line-height: 1.6; }
+
+.hub-empty { text-align: center; color: var(--text-dim); font-size: 14px; padding: 40px 20px; }
+.hub-cold { max-width: 52ch; margin: 30px auto 0; }
+.hub-cold h3 { font-family: var(--serif); font-weight: 400; font-size: 23px; margin: 0 0 12px; color: var(--text); }
+.hub-cold p { margin: 0 0 20px; line-height: 1.7; font-size: 14px; }
+
+@media (max-width: 620px) {
+  .hub-card { flex-direction: column; gap: 14px; }
+  .facet-label { min-width: 0; width: 100%; }
 }
 
 /* ── toast ─────────────────────────────────────────── */

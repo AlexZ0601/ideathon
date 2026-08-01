@@ -40,6 +40,7 @@
       <a href="#insight">Why it works</a>
       <a href="#map">White space</a>
       <a href="#limits">Limitations</a>
+      <button class="nav-cta" id="open-hub">Cofounder Hub</button>
       <button class="nav-cta" id="open-map">White Space Map</button>
       <button class="theme-toggle" id="theme-toggle" title="Theme">◐</button>
       <button class="nav-account" id="nav-account">Sign in</button>
@@ -285,6 +286,28 @@
   <article class="ws-detail" id="ws-detail" hidden></article>
 </section>
 
+<!-- ── Cofounder Hub ──────────────────────────────────────── -->
+<section id="hub-view" class="view">
+  <header class="topbar">
+    <button class="icon-btn" id="hub-back" aria-label="Back">
+      <svg viewBox="0 0 24 24"><path d="M19 12H6M11 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="ws-head">
+      <h2>Cofounder Hub</h2>
+      <p id="hub-count">loading…</p>
+    </div>
+    <button class="shortlist-btn" id="hub-edit">Edit your listing</button>
+  </header>
+
+  <div class="hub-body">
+    <div class="hub-controls">
+      <input class="claim-search" id="hub-q" placeholder="Search by name, school, org, or what they're building…" autocomplete="off">
+      <div class="hub-facets" id="hub-facets"></div>
+    </div>
+    <div class="hub-list" id="hub-list"></div>
+  </div>
+</section>
+
 <!-- ── Account ────────────────────────────────────────────── -->
 <section id="account-view" class="view">
   <header class="topbar">
@@ -418,6 +441,7 @@
 <script src="/static/motion.js"></script>
 <script src="/static/whitespace.js"></script>
 <script src="/static/accounts.js"></script>
+<script src="/static/hub.js"></script>
 <script src="/static/app.js"></script>
 </body>
 </html>
