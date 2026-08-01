@@ -3,7 +3,9 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>ResearchBridge — find the Princeton researcher who can solve your problem</title>
+<title>cofoundr — find the researcher who can solve your problem</title>
+<!-- inline data URI so the tab icon survives with wifi off, like everything else here -->
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23ff9d3d'/%3E%3Cstop offset='.55' stop-color='%23ff6b1a'/%3E%3Cstop offset='1' stop-color='%23ff3d68'/%3E%3C/linearGradient%3E%3CclipPath id='r'%3E%3Ccircle cx='20.2' cy='16' r='8.6'/%3E%3C/clipPath%3E%3C/defs%3E%3Ccircle cx='11.8' cy='16' r='8.6' fill='none' stroke='%23888' stroke-width='1.8'/%3E%3Ccircle cx='20.2' cy='16' r='8.6' fill='none' stroke='%23888' stroke-width='1.8'/%3E%3Ccircle cx='11.8' cy='16' r='8.6' fill='url(%23g)' clip-path='url(%23r)'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="/static/style.css">
 </head>
 <body>
@@ -14,8 +16,22 @@
 <section id="search-view" class="view is-active">
   <nav class="nav">
     <div class="brand">
-      <span class="brand-mark" aria-hidden="true"></span>
-      <span class="brand-name">ResearchBridge</span>
+      <!-- Two circles: the problem you have, the work someone already published.
+           The lit intersection is the whole product. -->
+      <svg class="brand-mark" viewBox="0 0 32 32" aria-hidden="true">
+        <defs>
+          <linearGradient id="cf-grad" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0" stop-color="#ff9d3d"/>
+            <stop offset="0.55" stop-color="#ff6b1a"/>
+            <stop offset="1" stop-color="#ff3d68"/>
+          </linearGradient>
+          <clipPath id="cf-right"><circle cx="20.2" cy="16" r="8.6"/></clipPath>
+        </defs>
+        <circle class="cf-ring" cx="11.8" cy="16" r="8.6"/>
+        <circle class="cf-ring" cx="20.2" cy="16" r="8.6"/>
+        <circle class="cf-lens" cx="11.8" cy="16" r="8.6" fill="url(#cf-grad)" clip-path="url(#cf-right)"/>
+      </svg>
+      <span class="brand-name">cofoundr</span>
     </div>
     <div class="nav-links">
       <a href="#how">How it works</a>
@@ -35,7 +51,7 @@
         You need <em>one</em> of them.
       </h1>
       <p class="hero-sub">
-        Describe the technical problem you're stuck on. ResearchBridge searches what
+        Describe the technical problem you're stuck on. Cofoundr searches what
         Princeton researchers have <strong>actually published</strong> — not profiles,
         not self-reported tags — and hands you the specific paper that justifies the
         match, plus an intro email you can send today.
@@ -95,7 +111,7 @@
       <div class="insight">
         <p class="insight-lead">
           Every marketplace dies of the cold start problem: empty on both sides, nobody
-          comes back. ResearchBridge doesn't have one, because <strong>one side is already
+          comes back. Cofoundr doesn't have one, because <strong>one side is already
           populated.</strong>
         </p>
         <p>
@@ -354,7 +370,7 @@
     <footer class="modal-foot">
       <p class="disclose" id="intro-hint"></p>
       <button class="ghost-btn" id="copy-btn">Copy</button>
-      <button class="btn-primary" id="send-btn"><span>Send via ResearchBridge</span></button>
+      <button class="btn-primary" id="send-btn"><span>Send via Cofoundr</span></button>
     </footer>
   </div>
 </div>

@@ -1,8 +1,8 @@
-# ResearchBridge
+# Cofoundr
 
 Connects student founders to the Princeton faculty and researchers who can actually solve their technical problem — by matching on **published work**, not profiles.
 
-Princeton's research output is public and indexed (papers, abstracts, lab pages, courses). ResearchBridge builds the entire supply side of the marketplace from that public data, so a founder opens the app on day one and finds hundreds of researchers — no faculty signup required. Describe a technical blocker in plain language, get evidence-backed matches ("Prof. Chen's 2024 paper on thermostable enzyme scaffolds addresses this directly"), shortlist with a swipe, and generate a specific, credible, ready-to-send intro email that cites their actual work.
+Princeton's research output is public and indexed (papers, abstracts, lab pages, courses). Cofoundr builds the entire supply side of the marketplace from that public data, so a founder opens the app on day one and finds hundreds of researchers — no faculty signup required. Describe a technical blocker in plain language, get evidence-backed matches ("Prof. Chen's 2024 paper on thermostable enzyme scaffolds addresses this directly"), shortlist with a swipe, and generate a specific, credible, ready-to-send intro email that cites their actual work.
 
 Built for the PrincetonBuilds Ideathon.
 
@@ -81,7 +81,7 @@ is a name search, not a profile form. This is the spec's "optional lightweight o
 (CLAUDE.md line 26), and it is deliberately not the thing line 21 warns against: nothing about
 the core product requires a professor to do anything.
 
-The nicest consequence: you can message a researcher who has never heard of ResearchBridge.
+The nicest consequence: you can message a researcher who has never heard of Cofoundr.
 The message waits. If they ever claim their profile, it is sitting in their inbox — and the
 claim screen tells them so ("1 message waiting") before they commit. Until then the app says
 plainly that the draft still has to go out by email.

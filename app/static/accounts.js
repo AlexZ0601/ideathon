@@ -382,7 +382,7 @@
         (m) => `
         <button class="msg-item ${m.read_at || A.box === "sent" ? "" : "is-unread"}" data-thread="${m.thread_id}">
           <span class="msg-who">${esc(
-            A.box === "inbox" ? m.from_name : m.to_name || "Not on ResearchBridge yet"
+            A.box === "inbox" ? m.from_name : m.to_name || "Not on Cofoundr yet"
           )}</span>
           <span class="msg-subject">${esc(m.subject)}</span>
           <span class="msg-preview">${esc((m.body || "").slice(0, 90))}</span>

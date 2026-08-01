@@ -1,4 +1,4 @@
-"""ResearchBridge web app: FastAPI backend + static swipe UI.
+"""Cofoundr web app: FastAPI backend + static swipe UI.
 
 Match results are cached to data/cache/ keyed by query, so a repeated demo
 query costs nothing and returns instantly — and so the demo survives a dead
@@ -30,8 +30,9 @@ from api import store  # noqa: E402
 
 CACHE_DIR = ROOT / "data" / "cache"
 STATIC = Path(__file__).resolve().parent / "static"
+NO_CACHE = {"Cache-Control": "no-store, must-revalidate", "Pragma": "no-cache"}
 
-app = FastAPI(title="ResearchBridge")
+app = FastAPI(title="Cofoundr")
 
 SCENARIOS = [
     {
@@ -440,7 +441,7 @@ def api_send(req: MessageRequest, user=Depends(require_user)):
         # the honest bit: most researchers have not claimed a profile, so this
         # is a draft the founder still has to send by email
         "notice": (
-            f"{researcher['name']} is on ResearchBridge — they'll see this in their inbox."
+            f"{researcher['name']} is on Cofoundr — they'll see this in their inbox."
             if owner
             else f"{researcher['name']} hasn't claimed their profile yet. This is saved in "
             "your sent folder; copy it into an email to actually reach them."
@@ -478,7 +479,21 @@ def api_whitespace():
 
 @app.get("/")
 def index():
-    return FileResponse(STATIC / "index.html")
+    return FileResponse(STATIC / "index.html", headers=NO_CACHE)
+
+
+@app.middleware("http")
+async def no_cache_static(request, call_next):
+    """Serve assets uncached.
+
+    A stale style.css after an edit looks exactly like a broken change, and
+    debugging that at 7pm on demo day is a bad use of the evening. Localhost
+    has no bandwidth problem worth trading for it.
+    """
+    response = await call_next(request)
+    if request.url.path.startswith("/static") or request.url.path == "/":
+        response.headers.update(NO_CACHE)
+    return response
 
 
 app.mount("/static", StaticFiles(directory=STATIC), name="static")

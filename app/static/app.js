@@ -1,4 +1,4 @@
-/* ResearchBridge — swipe UI
+/* Cofoundr — swipe UI
    The deck renders three cards deep; only the top one is interactive. */
 
 const $ = (id) => document.getElementById(id);
@@ -344,7 +344,7 @@ async function openIntro(match) {
     const offline = err instanceof TypeError;
     $("intro-body").innerHTML = `<p class="loading-note">${
       offline
-        ? "Can't reach the ResearchBridge server. Is <code>uvicorn</code> still running in your terminal?"
+        ? "Can't reach the Cofoundr server. Is <code>uvicorn</code> still running in your terminal?"
         : `The draft request failed: ${esc(String(err.message || err).slice(0, 200))}`
     }</p>`;
     console.error(err);

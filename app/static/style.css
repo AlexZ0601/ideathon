@@ -95,13 +95,20 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line-soft);
 }
-.nav-links { display: flex; gap: 26px; }
+.nav-links { display: flex; align-items: center; gap: 22px; flex: none; }
 .nav-links a {
   color: var(--text-dim); text-decoration: none; font-size: 13.5px;
-  transition: color .2s;
+  white-space: nowrap; transition: color .2s;
 }
 .nav-links a:hover { color: var(--accent); }
-@media (max-width: 640px) { .nav-links { display: none; } }
+.brand { flex: none; }
+
+/* Drop the section anchors before the buttons — the buttons are the only
+   things in here you can't reach by scrolling. */
+@media (max-width: 1000px) {
+  .nav-links a { display: none; }
+  .nav-links { gap: 10px; }
+}
 
 .landing { width: 100%; }
 
@@ -119,13 +126,23 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
   text-transform: uppercase; color: var(--text-faint); margin: 0 0 20px;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; }
+.brand { display: flex; align-items: center; gap: 9px; }
 .brand-mark {
-  width: 22px; height: 22px; border-radius: 7px;
-  background: linear-gradient(140deg, var(--accent), #ff4d6d);
-  box-shadow: 0 0 24px var(--accent-soft);
+  width: 26px; height: 26px; flex: none;
+  overflow: visible;
+  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 42%, transparent));
 }
-.brand-name { font-weight: 600; letter-spacing: -.01em; font-size: 15px; }
+.brand-mark .cf-ring {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  opacity: .34;
+}
+/* the global `svg { stroke: currentColor }` would outline the lens too */
+.brand-mark .cf-lens { stroke: none; }
+.brand-name {
+  font-weight: 650; letter-spacing: -.025em; font-size: 17px;
+}
 
 .hero {
   font-family: var(--serif);
