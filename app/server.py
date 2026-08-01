@@ -15,7 +15,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Request, Response, UploadFile
+from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -24,7 +24,6 @@ ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(ROOT))
 
 from api import auth as auth_mod  # noqa: E402
-from api import limits  # noqa: E402
 from api import intro as intro_mod  # noqa: E402
 from api import match as match_mod  # noqa: E402
 from api import resume as resume_mod  # noqa: E402
@@ -104,16 +103,6 @@ def intro_cache_path(req: IntroRequest) -> Path:
     return CACHE_DIR / f"intro_{key}.json"
 
 
-def spend_guard(request: Request):
-    """Call before anything that would hit the OpenAI API uncached."""
-    ip = (request.headers.get("x-forwarded-for", "").split(",")[0].strip()
-          or (request.client.host if request.client else "unknown"))
-    try:
-        limits.check(ip)
-    except limits.RateLimited as e:
-        raise HTTPException(429, str(e), headers={"Retry-After": str(e.retry_after)})
-
-
 def current_user(rb_session: str | None = Cookie(default=None)):
     """Resolved user or None. Use require_user() when the route needs one."""
     uid = auth_mod.read_token(rb_session)
@@ -132,7 +121,7 @@ def scenarios():
 
 
 @app.post("/api/match")
-def api_match(req: MatchRequest, request: Request, user=Depends(current_user)):
+def api_match(req: MatchRequest, user=Depends(current_user)):
     if not req.problem.strip():
         raise HTTPException(400, "problem text is required")
 
@@ -141,9 +130,6 @@ def api_match(req: MatchRequest, request: Request, user=Depends(current_user)):
     if path.exists() and not req.refresh:
         with open(path) as f:
             return {"cached": True, **json.load(f)}
-
-    # only a miss reaches the API, so only a miss costs anyone anything
-    spend_guard(request)
 
     matches = match_mod.match(req.problem, k=req.k, major=req.major, seeking=seeking)
     try:
@@ -161,7 +147,7 @@ def api_match(req: MatchRequest, request: Request, user=Depends(current_user)):
 
 
 @app.post("/api/intro")
-def api_intro(req: IntroRequest, request: Request, user=Depends(current_user)):
+def api_intro(req: IntroRequest, user=Depends(current_user)):
     founder = req.founder.model_dump()
     # a signed-in founder's saved profile beats whatever the anonymous form had
     if user and user["role"] == "founder":
@@ -181,7 +167,6 @@ def api_intro(req: IntroRequest, request: Request, user=Depends(current_user)):
         with open(path) as f:
             return {"cached": True, **json.load(f)}
 
-    spend_guard(request)
     researchers = intro_mod.load_researchers()
     researcher, work = intro_mod.find(researchers, req.researcher_id, req.work_id)
     email = intro_mod.draft(researcher, work, req.problem, founder)
@@ -558,10 +543,9 @@ class TranslateRequest(BaseModel):
 
 
 @app.post("/api/translate")
-def api_translate(req: TranslateRequest, request: Request, user=Depends(require_user)):
+def api_translate(req: TranslateRequest, user=Depends(require_user)):
     if not req.body.strip():
         raise HTTPException(400, "Nothing to translate.")
-    spend_guard(request)
     try:
         return translate_mod.translate(req.body, req.subject)
     except Exception as e:
@@ -764,8 +748,7 @@ class PositionRequest(BaseModel):
 
 
 @app.post("/api/whitespace/position")
-def api_position(req: PositionRequest, request: Request):
-    spend_guard(request)
+def api_position(req: PositionRequest):
     """Where does this idea sit relative to what's already funded?
 
     Closes the loop between the two halves of the app: the map finds open
