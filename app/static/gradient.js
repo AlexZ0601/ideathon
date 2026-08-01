@@ -165,7 +165,7 @@
     // light mode washes out fast, so it gets a lighter touch
     // Tuned down hard after the transparent-body fix: with nothing muting it,
     // 1.55 turned the page into a magenta wash you couldn't read over.
-    strength = dark ? 0.42 : 0.22;
+    strength = dark ? 0.27 : 0.16;
     gl.uniform1f(U.uStrength, strength);
   }
 

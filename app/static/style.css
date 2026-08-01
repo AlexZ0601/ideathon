@@ -12,8 +12,8 @@
   --text:          #eef0f6;
   --text-dim:      #a2a8bd;
   --text-faint:    #6f768e;
-  --accent:        #ff7a1a;
-  --accent-soft:   #ff7a1a1f;
+  --accent:        #6d5cff;
+  --accent-soft:   #6d5cff24;
   --keep:          #34d399;
   --keep-soft:     #34d39926;
   --pass:          #f87171;
@@ -40,8 +40,8 @@
     --text:        #17181d;
     --text-dim:    #55596a;
     --text-faint:  #8b8f9f;
-    --accent:      #d9600a;
-    --accent-soft: #d9600a14;
+    --accent:      #5b4bf5;
+    --accent-soft: #5b4bf518;
     --shadow:      0 20px 50px -20px #0000002e, 0 1px 3px #00000012;
   }
 }
@@ -56,8 +56,8 @@
   --text:        #17181d;
   --text-dim:    #55596a;
   --text-faint:  #8b8f9f;
-  --accent:      #d9600a;
-  --accent-soft: #d9600a14;
+  --accent:      #5b4bf5;
+  --accent-soft: #5b4bf518;
   --shadow:      0 20px 50px -20px #0000002e, 0 1px 3px #00000012;
 }
 
@@ -145,26 +145,30 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 .brand { display: flex; align-items: center; gap: 9px; }
 .brand-mark {
-  width: 26px; height: 26px; flex: none;
+  width: 31px; height: 26px; flex: none;
   overflow: visible;
-  filter: drop-shadow(0 0 9px color-mix(in srgb, var(--accent) 42%, transparent));
+  filter: drop-shadow(0 0 10px color-mix(in srgb, var(--accent) 38%, transparent));
   transition: transform .5s var(--ease), filter .5s var(--ease);
 }
 .brand:hover .brand-mark {
-  transform: rotate(-14deg) scale(1.14);
-  filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) 70%, transparent));
+  transform: scale(1.1);
+  filter: drop-shadow(0 0 18px color-mix(in srgb, var(--accent) 65%, transparent));
 }
-.brand-mark .cf-ring {
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  opacity: .34;
+.brand-mark .cf-ring-a, .brand-mark .cf-bar { stroke: var(--accent); }
+.brand-mark .cf-ring-b { stroke: currentColor; }
+
+/* the bar draws itself in on load, so the two halves visibly connect */
+.brand-mark .cf-bar {
+  stroke-dasharray: 22;
+  stroke-dashoffset: 22;
+  animation: bar-link .9s var(--ease) .35s forwards;
 }
-/* the global `svg { stroke: currentColor }` would outline the lens too */
-.brand-mark .cf-lens { stroke: none; }
+@keyframes bar-link { to { stroke-dashoffset: 0; } }
+
 .brand-name {
   font-weight: 650; letter-spacing: -.025em; font-size: 17px;
 }
+.brand-name b { color: var(--accent); font-weight: 650; }
 
 .hero {
   font-family: var(--serif);
@@ -177,7 +181,7 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 /* Flowing gradient fill. The background is oversized and slid across, which
    is what makes the colour travel through the glyphs instead of just cycling. */
 .hero em, .count {
-  background: linear-gradient(100deg, #ff9d3d, #ff3d68 28%, #7b5cff 52%, #21b8ff 72%, #ff9d3d);
+  background: linear-gradient(100deg, #6d5cff, #a78bfa 26%, #22d3ee 50%, #f472b6 74%, #6d5cff);
   background-size: 320% 100%;
   -webkit-background-clip: text;
   background-clip: text;
@@ -1058,13 +1062,6 @@ body:has(#gradient-bg) { background-image: none; background-color: transparent; 
 }
 .btn-primary:hover::after { transform: translateX(120%); transition: transform .75s var(--ease); }
 
-/* The logo's lens breathes very slightly, so the mark reads as alive */
-@keyframes lens-pulse {
-  0%, 100% { opacity: 1; }
-  50%      { opacity: .78; }
-}
-.brand-mark .cf-lens { animation: lens-pulse 4.5s ease-in-out infinite; }
-.brand:hover .cf-ring { opacity: .62; transition: opacity .3s var(--ease); }
 
 /* Step cards lift and light their rule on hover */
 .step { position: relative; transition: transform .28s var(--ease), border-color .28s; }
@@ -1083,7 +1080,7 @@ body:has(#gradient-bg) { background-image: none; background-color: transparent; 
 @media (prefers-reduced-motion: reduce) {
   #constellation { display: none; }
   .reveal { opacity: 1; transform: none; }
-  .brand-mark .cf-lens { animation: none; }
+  .brand-mark .cf-bar { animation: none; stroke-dashoffset: 0; }
 }
 
 /* ── cofounder hub ─────────────────────────────────── */
