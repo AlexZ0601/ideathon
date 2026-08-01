@@ -48,6 +48,7 @@
   <div class="landing">
     <header class="search-inner">
       <p class="eyebrow">Princeton · public research data</p>
+      <p class="telemetry" id="telemetry"></p>
       <h1 class="hero">
         Princeton has <span class="count">4,159</span> researchers.<br>
         You need <em>one</em> of them.
@@ -59,7 +60,7 @@
         match, plus an intro email you can send today.
       </p>
 
-      <form id="search-form" class="search-box" autocomplete="off">
+      <form id="search-form" class="search-box beam" autocomplete="off">
         <textarea id="problem-input" rows="3" placeholder="e.g. Our assay degrades above 40°C and we can't stabilize the enzyme…" aria-label="Describe your technical problem"></textarea>
         <button type="submit" class="btn-primary" id="search-btn">
           <span>Find researchers</span>
@@ -467,6 +468,7 @@
 
 <script src="/static/gradient.js"></script>
 <script src="/static/motion.js"></script>
+<script src="/static/hud.js"></script>
 <script src="/static/whitespace.js"></script>
 <script src="/static/accounts.js"></script>
 <script src="/static/hub.js"></script>

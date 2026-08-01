@@ -94,7 +94,7 @@ $("search-form").addEventListener("submit", async (e) => {
 
 function cardEl(match, rank) {
   const el = document.createElement("article");
-  el.className = "card";
+  el.className = "card hud";
 
   const signals = (match.signals || [])
     .map((s) => `<span class="signal${/Established PI/.test(s) ? " is-pi" : ""}">${esc(s)}</span>`)

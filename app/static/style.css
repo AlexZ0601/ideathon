@@ -1139,6 +1139,64 @@ body:has(#gradient-bg) { background-image: none; background-color: transparent; 
   .facet-label { min-width: 0; width: 100%; }
 }
 
+/* ── HUD: beam, brackets, telemetry ────────────────── */
+
+/* Border beam. A conic gradient masked to the border box, rotated by an
+   animatable custom property — this is what border-beam does under the hood,
+   minus the React wrapper. */
+@property --beam { syntax: "<angle>"; initial-value: 0deg; inherits: false; }
+
+.beam { position: relative; }
+.beam::after {
+  content: ""; position: absolute; inset: -1px;
+  border-radius: inherit; padding: 1px;
+  background: conic-gradient(from var(--beam),
+              transparent 0 62%,
+              color-mix(in srgb, var(--accent) 85%, transparent) 78%,
+              #f472b6 88%, transparent 96%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask-composite: exclude;
+  animation: beam-spin 5s linear infinite;
+  pointer-events: none;
+  opacity: .85;
+}
+@keyframes beam-spin { to { --beam: 360deg; } }
+
+/* HUD corner brackets — four L-shaped ticks, no extra elements. */
+.hud { position: relative; }
+.hud::before, .hud::after {
+  content: ""; position: absolute; width: 13px; height: 13px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, transparent);
+  pointer-events: none; transition: opacity .3s var(--ease);
+}
+.hud::before { top: 7px; left: 7px; border-right: 0; border-bottom: 0; }
+.hud::after  { bottom: 7px; right: 7px; border-left: 0; border-top: 0; }
+
+/* Telemetry readout: monospace, real numbers from the index. */
+.telemetry {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 9px;
+  font-family: var(--mono); font-size: 10.5px; letter-spacing: .08em;
+  color: var(--text-faint); margin: 0 0 22px;
+}
+.telemetry span { display: inline-flex; align-items: center; gap: 5px; cursor: help; }
+.telemetry i {
+  font-style: normal; color: var(--accent); opacity: .85;
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+  border-radius: 4px; padding: 1px 4px; font-size: 9.5px;
+}
+.telemetry u { text-decoration: none; opacity: .35; }
+.telemetry .tick {
+  color: var(--accent); font-weight: 400;
+  animation: blink 1.15s steps(1) infinite;
+}
+@keyframes blink { 50% { opacity: 0; } }
+
+@media (prefers-reduced-motion: reduce) {
+  .beam::after, .telemetry .tick { animation: none; }
+}
+
 /* ── techy grid ────────────────────────────────────── */
 
 /* Perspective grid receding to the horizon, plus a slow scan sweep. Pure CSS
@@ -1162,6 +1220,15 @@ body:has(#gradient-bg) { background-image: none; background-color: transparent; 
   animation: grid-drift 22s linear infinite;
 }
 @keyframes grid-drift { to { background-position: 0 46px; } }
+
+/* Light under the grid that tracks the pointer — --gx/--gy come from hud.js.
+   Lifts the grid from printed texture to something that responds. */
+.techgrid::before {
+  -webkit-mask-image: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 18%),
+                      #000 0%, #00000055 45%, transparent 78%);
+  mask-image: radial-gradient(420px circle at var(--gx, 50%) var(--gy, 18%),
+              #000 0%, #00000055 45%, transparent 78%);
+}
 
 /* one bright line sweeping down, like a readout refreshing */
 .techgrid::after {
