@@ -60,10 +60,13 @@ $("search-form").addEventListener("submit", async (e) => {
   btn.querySelector("span").textContent = "Searching 23,112 abstracts…";
 
   try {
+    // Ranked matches first — that part is a matrix multiply and comes back in
+    // milliseconds. A novel query used to sit on this screen for 20 seconds
+    // waiting for the LLM to write every rationale, which reads as broken.
     const res = await fetch("/api/match", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ problem, k: PAGE }),
+      body: JSON.stringify({ problem, k: PAGE, rationales: false }),
     });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
@@ -77,6 +80,8 @@ $("search-form").addEventListener("submit", async (e) => {
     updateShortlistCount();
     show("deck-view");
     renderDeck();
+
+    if (data.partial) upgradeRationales(problem);
   } catch (err) {
     toast(
       err instanceof TypeError
@@ -89,6 +94,41 @@ $("search-form").addEventListener("submit", async (e) => {
     btn.querySelector("span").textContent = "Find researchers";
   }
 });
+
+/* Fetch the rationale sentences in the background and patch them into cards
+   that are already on screen. Guarded by the problem string so a search the
+   user has since replaced can't overwrite the current deck. */
+async function upgradeRationales(problem) {
+  try {
+    const res = await fetch("/api/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ problem, k: PAGE }),
+    });
+    if (!res.ok) return;
+    const data = await res.json();
+    if (state.problem !== problem) return;   // user moved on
+
+    const byId = new Map(data.matches.map((m) => [m.researcher_id, m.rationale]));
+    state.matches.forEach((m) => {
+      const r = byId.get(m.researcher_id);
+      if (r) m.rationale = r;
+    });
+
+    // repaint only the visible cards, so a swipe in progress isn't disturbed
+    document.querySelectorAll("#deck .card").forEach((el, i) => {
+      const depth = document.querySelectorAll("#deck .card").length - 1 - i;
+      const m = state.matches[state.cursor + depth];
+      const p = el.querySelector(".rationale");
+      if (m && p && m.rationale) {
+        p.textContent = m.rationale;
+        p.classList.remove("is-pending");
+      }
+    });
+  } catch {
+    /* cards keep their cited paper, which is the load-bearing part */
+  }
+}
 
 /* ── deck ────────────────────────────────────────── */
 
@@ -111,7 +151,9 @@ function cardEl(match, rank) {
       <p class="evidence-title">${esc(match.matched_work.title)}
         <span class="evidence-year">(${match.matched_work.year ?? "n.d."})</span></p>
     </div>
-    <p class="rationale">${esc(match.rationale || "Semantically closest work in their recent publication record.")}</p>
+    <p class="rationale${match.rationale ? "" : " is-pending"}">${
+      esc(match.rationale || "Reading this paper against your problem…")
+    }</p>
     <div class="signals">${signals}</div>
   `;
   return el;

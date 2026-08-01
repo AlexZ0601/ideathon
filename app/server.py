@@ -61,6 +61,10 @@ class MatchRequest(BaseModel):
     major: str | None = None
     k: int = 12
     refresh: bool = False
+    # Ranking takes ~50ms; writing k rationales takes ~10-20s. The client asks
+    # for ranking first so cards appear immediately, then asks again for the
+    # full version and patches the sentences in.
+    rationales: bool = True
 
 
 class Founder(BaseModel):
@@ -132,6 +136,12 @@ def api_match(req: MatchRequest, user=Depends(current_user)):
             return {"cached": True, **json.load(f)}
 
     matches = match_mod.match(req.problem, k=req.k, major=req.major, seeking=seeking)
+
+    if not req.rationales:
+        # Ranked only. Deliberately not cached: it is cheap to recompute, and
+        # caching it would shadow the full version that arrives moments later.
+        return {"cached": False, "partial": True, "problem": req.problem, "matches": matches}
+
     try:
         matches = match_mod.add_rationales(req.problem, matches)
     except Exception as e:
