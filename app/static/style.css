@@ -107,7 +107,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 .nav {
   position: sticky; top: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between;
-  padding: 16px max(24px, calc((100% - 1080px) / 2));
+  /* Wider than the 1080px content column: the nav carries the wordmark, four
+     anchors and four buttons, which needs ~1150px. Constraining it to 1080
+     left space-between with nothing to distribute and the logo ended up
+     touching "How it works". */
+  padding: 16px max(24px, calc((100% - 1290px) / 2));
+  gap: 34px;   /* floor on brand-to-links separation, whatever the width */
   background: color-mix(in srgb, var(--bg) 82%, transparent);
   backdrop-filter: blur(12px);
   border-bottom: 1px solid var(--line-soft);
@@ -122,9 +127,12 @@ svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width:
 
 /* Drop the section anchors before the buttons — the buttons are the only
    things in here you can't reach by scrolling. */
-@media (max-width: 1000px) {
+/* Drop the anchors before things get tight, not after. They're all reachable
+   by scrolling; the buttons aren't. */
+@media (max-width: 1240px) {
   .nav-links a { display: none; }
   .nav-links { gap: 10px; }
+  .nav { gap: 20px; }
 }
 
 .landing { width: 100%; }
