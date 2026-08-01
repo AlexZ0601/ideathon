@@ -50,14 +50,25 @@ async function loadScenarios() {
   }
 }
 
-$("search-form").addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const problem = $("problem-input").value.trim();
+/* Single entry point for running a search, so the White Space hand-off behaves
+   exactly like typing one. Switching to the deck first means a slow query
+   shows a spinner where the results will be, instead of stranding you on the
+   landing page wondering whether anything happened. */
+async function runSearch(problem, { fromDeck = false } = {}) {
+  problem = (problem || "").trim();
   if (!problem) return;
 
   const btn = $("search-btn");
   btn.disabled = true;
   btn.querySelector("span").textContent = "Searching 23,112 abstracts…";
+
+  if (fromDeck) {
+    $("topbar-problem").textContent = problem;
+    $("deck").innerHTML = "";
+    $("deck-empty").hidden = true;
+    $("deck-loading").hidden = false;
+    show("deck-view");
+  }
 
   try {
     // Ranked matches first — that part is a matrix multiply and comes back in
@@ -90,9 +101,17 @@ $("search-form").addEventListener("submit", async (e) => {
     );
     console.error(err);
   } finally {
+    $("deck-loading").hidden = true;
     btn.disabled = false;
     btn.querySelector("span").textContent = "Find researchers";
   }
+}
+
+window.runSearch = runSearch;
+
+$("search-form").addEventListener("submit", (e) => {
+  e.preventDefault();
+  runSearch($("problem-input").value);
 });
 
 /* Fetch the rationale sentences in the background and patch them into cards

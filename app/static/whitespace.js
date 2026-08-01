@@ -374,10 +374,11 @@
 
     $("ws-find").onclick = () => {
       const seed = `${c.name}. ${c.thesis || ""}`.trim();
-      window.showView("search-view");
-      const input = document.getElementById("problem-input");
-      input.value = seed;
-      document.getElementById("search-form").requestSubmit();
+      document.getElementById("problem-input").value = seed;
+      // A cluster thesis is always a novel query, so this never hits the cache.
+      // fromDeck puts the spinner where the results will appear rather than
+      // dropping the user back on the landing page mid-search.
+      window.runSearch(seed, { fromDeck: true });
     };
     $("ws-hub").onclick = () => {
       window.Hub.open();

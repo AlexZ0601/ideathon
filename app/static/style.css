@@ -459,7 +459,15 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); opacity: 1
 /* ── deck ──────────────────────────────────────────── */
 
 .deck-wrap { flex: 1; position: relative; display: grid; place-items: center; padding: 20px; min-height: 0; }
-.deck { position: relative; width: min(470px, 100%); height: min(560px, 100%); }
+/* Scales with the window. A fixed 470px card marooned in a 1440px viewport
+   reads as a broken layout rather than a deliberate one. */
+.deck {
+  position: relative;
+  width: clamp(320px, 40vw, 620px);
+  height: clamp(440px, 70vh, 700px);
+  max-width: 100%;
+  max-height: 100%;
+}
 
 .card {
   position: absolute; inset: 0;
@@ -544,6 +552,13 @@ input::placeholder, textarea::placeholder { color: var(--text-faint); opacity: 1
 }
 .stamp.keep { color: var(--keep); background: var(--keep-soft); }
 .stamp.pass { color: var(--pass); background: var(--pass-soft); left: auto; right: 26px; }
+
+/* Shown while a search is in flight, so a slow uncached query doesn't look
+   like the app hung. Sits over the deck, not the landing page. */
+.deck-loading {
+  position: absolute; inset: 0; z-index: 5;
+  display: grid; place-content: center; gap: 4px; text-align: center;
+}
 
 .deck-empty { position: absolute; inset: 0; display: grid; place-content: center; text-align: center; gap: 8px; }
 .deck-empty h2 { font-family: var(--serif); font-weight: 400; font-size: 30px; margin: 0; }
