@@ -18,6 +18,8 @@ import argparse
 import heapq
 import json
 import os
+import sys
+from concurrent.futures import ThreadPoolExecutor
 from functools import lru_cache
 from pathlib import Path
 
@@ -31,7 +33,11 @@ CHAT_MODEL = os.environ.get("RB_CHAT_MODEL", "gpt-4.1-mini")
 
 W_BEST = 0.65        # weight on best single paper
 W_MEAN = 0.35        # weight on portfolio centrality
-POOL = 300           # candidates rescored before boosts are applied
+# Candidates rescored before boosts. Scales with k so asking for 200 matches
+# actually reaches 200 — paper-dedup drops co-authors, so the pool has to be
+# comfortably larger than the number of results wanted.
+POOL_BASE = 300
+POOL_PER_K = 12
 
 
 @lru_cache(maxsize=1)
@@ -144,7 +150,8 @@ def match(problem_text, k=10, major=None, prefer_faculty=True, seeking=None):
     # researcher during selection: co-authors of a hot paper would otherwise
     # occupy half the result list with identical evidence.
     heap = []
-    for i in np.argsort(mean_sims)[::-1][:POOL]:
+    pool = min(len(mean_sims), max(POOL_BASE, k * POOL_PER_K))
+    for i in np.argsort(mean_sims)[::-1][:pool]:
         i = int(i)
         rows = idx["work_rows"][i]
         if not rows:
@@ -204,8 +211,37 @@ Each sentence is shown on its own card, so it must stand alone. Never refer to o
 Return JSON: {"rationales": [{"i": <index>, "text": "<sentence>"}]}"""
 
 
+RATIONALE_CHUNK = 12   # matches per LLM call
+
+
 def add_rationales(problem_text, matches):
-    """One batched LLM call for all matches — cheaper and faster than k calls."""
+    """Rationales for every match, in parallel chunks.
+
+    One call for all of them was fine at k=12 but serialises badly at k=50 --
+    the model writes fifty sentences before the first byte comes back. Chunks
+    of a dozen run concurrently, so wall time stays roughly flat as k grows.
+    """
+    if not matches:
+        return matches
+
+    chunks = [
+        matches[i : i + RATIONALE_CHUNK] for i in range(0, len(matches), RATIONALE_CHUNK)
+    ]
+    if len(chunks) == 1:
+        return _rationale_chunk(problem_text, chunks[0])
+
+    with ThreadPoolExecutor(max_workers=min(6, len(chunks))) as pool:
+        futures = [pool.submit(_rationale_chunk, problem_text, c) for c in chunks]
+        for f in futures:
+            try:
+                f.result()
+            except Exception as e:
+                # a failed chunk costs those cards their rationale, not the search
+                print(f"rationale chunk failed: {e}", file=sys.stderr)
+    return matches
+
+
+def _rationale_chunk(problem_text, matches):
     from openai import OpenAI
 
     load_dotenv(ROOT / ".env")

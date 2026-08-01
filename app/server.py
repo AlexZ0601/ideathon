@@ -12,6 +12,7 @@ import hashlib
 import json
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from fastapi import Cookie, Depends, FastAPI, File, Form, HTTPException, Response, UploadFile
@@ -201,6 +202,12 @@ def public_user(user):
             "school": p.get("school"),
             "org": p.get("org"),
             "looking": p.get("looking"),
+            "website": p.get("website"),
+            "github": p.get("github"),
+            "linkedin": p.get("linkedin"),
+            "skills": p.get("skills"),
+            "stage": p.get("stage"),
+            "commitment": p.get("commitment"),
             "resume_name": p.get("resume_name"),
             # the parsed text can run to 20k chars; the client only needs to
             # know whether it exists and roughly how much was read
@@ -323,6 +330,47 @@ class ProfileRequest(BaseModel):
     school: str | None = None
     org: str | None = None
     looking: bool | None = None
+    website: str | None = None
+    github: str | None = None
+    linkedin: str | None = None
+    skills: str | None = None
+    stage: str | None = None
+    commitment: str | None = None
+
+
+class PasswordRequest(BaseModel):
+    current: str
+    new_password: str
+
+
+@app.post("/api/account/password")
+def api_password(req: PasswordRequest, user=Depends(require_user)):
+    if not auth_mod.verify_password(req.current, user["pw_hash"]):
+        raise HTTPException(403, "Current password is incorrect.")
+    problem = auth_mod.password_problem(req.new_password)
+    if problem:
+        raise HTTPException(400, problem)
+    store.change_password(user["id"], auth_mod.hash_password(req.new_password))
+    return {"ok": True}
+
+
+@app.get("/api/account/export")
+def api_export(user=Depends(require_user)):
+    return store.export_account(user["id"])
+
+
+class DeleteRequest(BaseModel):
+    confirm: str
+
+
+@app.post("/api/account/delete")
+def api_delete(req: DeleteRequest, response: Response, user=Depends(require_user)):
+    # typed confirmation, because this is irreversible and one stray click away
+    if req.confirm.strip().upper() != "DELETE":
+        raise HTTPException(400, 'Type DELETE to confirm.')
+    store.delete_account(user["id"])
+    response.delete_cookie(auth_mod.COOKIE_NAME)
+    return {"ok": True}
 
 
 @app.put("/api/profile")
@@ -334,6 +382,77 @@ def api_profile(req: ProfileRequest, user=Depends(require_user)):
         fields["looking"] = 1 if fields["looking"] else 0
     store.upsert_founder_profile(user["id"], **fields)
     return public_user(store.user_by_id(user["id"]))
+
+
+# ── researcher directory ───────────────────────────────
+
+@lru_cache(maxsize=1)
+def _dept_facets():
+    counts = {}
+    for r in match_mod.load_index()["researchers"]:
+        if r["dept"]:
+            counts[r["dept"]] = counts.get(r["dept"], 0) + 1
+    return sorted(
+        ({"name": k, "count": v} for k, v in counts.items()), key=lambda x: -x["count"]
+    )
+
+
+@app.get("/api/researchers/browse")
+def api_browse(
+    q: str | None = None,
+    dept: str | None = None,
+    seniority: str | None = None,
+    offset: int = 0,
+    limit: int = 24,
+):
+    """Browse the whole indexed directory, not just search results.
+
+    This is the professor-side counterpart to the cofounder hub — except it
+    isn't cold-start limited, because all 4,159 are already here from public
+    data. Nobody had to sign up for this page to have something on it.
+    """
+    rows = match_mod.load_index()["researchers"]
+    needle = (q or "").strip().lower()
+
+    out = []
+    for r in rows:
+        if dept and r["dept"] != dept:
+            continue
+        if seniority == "pi" and (r.get("seniority") or 0) < 0.5:
+            continue
+        if seniority == "early" and (r.get("seniority") or 0) >= 0.25:
+            continue
+        if needle:
+            hay = f"{r['name']} {r['dept'] or ''} {' '.join(r['tags'] or [])}".lower()
+            if needle not in hay:
+                continue
+        out.append(r)
+
+    out.sort(key=lambda r: -r["works_count_recent"])
+    total = len(out)
+    page = out[offset : offset + limit]
+
+    return {
+        "total": total,
+        "offset": offset,
+        "limit": limit,
+        "has_more": offset + limit < total,
+        "facets": {"depts": _dept_facets()[:24]},
+        "researchers": [
+            {
+                "researcher_id": r["id"],
+                "name": r["name"],
+                "dept": r["dept"],
+                "tags": r["tags"],
+                "works": r["works_count_recent"],
+                "seniority": r.get("seniority"),
+                "h_index": (r.get("author_stats") or {}).get("h_index"),
+                "recent": strip_tags((r["works"][0] or {}).get("title", ""))[:130],
+                "claimed": bool(store.claim_owner(r["id"])),
+            }
+            for r in page
+        ],
+    }
 
 
 # ── cofounder hub ──────────────────────────────────────
@@ -622,6 +741,85 @@ def api_thread(thread_id: int, user=Depends(require_user)):
 @app.get("/api/terms")
 def api_terms():
     return FileResponse(STATIC / "terms.html", media_type="text/html", headers=NO_CACHE)
+
+
+class PositionRequest(BaseModel):
+    problem: str
+
+
+@app.post("/api/whitespace/position")
+def api_position(req: PositionRequest):
+    """Where does this idea sit relative to what's already funded?
+
+    Closes the loop between the two halves of the app: the map finds open
+    territory, and this tells a founder whether the thing they're already
+    building is standing in it or in a crowd. Uses the same style-decorrelated
+    space the gap scores were computed in, so the numbers are comparable.
+    """
+    import numpy as np
+
+    path = ROOT / "data" / "ws_vecs.npz"
+    if not path.exists():
+        raise HTTPException(404, "White Space vectors missing — run ingest/whitespace.py")
+
+    z = np.load(path)
+    supply_raw, demand_raw = z["supply_vecs"], z["demand_vecs"]
+
+    sys.path.insert(0, str(ROOT))
+    from ingest.whitespace_map import decorrelate_style
+
+    supply, demand = decorrelate_style(supply_raw, demand_raw)
+
+    qv = match_mod.embed_query(req.problem)
+    # project the query into the same centred space as the corpora
+    q_s = qv - supply_raw.mean(axis=0)
+    q_s /= np.linalg.norm(q_s) + 1e-9
+    q_d = qv - demand_raw.mean(axis=0)
+    q_d /= np.linalg.norm(q_d) + 1e-9
+
+    sup_sims = supply @ q_s.astype("float32")
+    dem_sims = demand @ q_d.astype("float32")
+
+    with open(ROOT / "data" / "ws_supply.json") as f:
+        supply_meta = json.load(f)
+    with open(ROOT / "data" / "ws_demand.json") as f:
+        demand_meta = json.load(f)
+
+    top_sup = np.argsort(sup_sims)[::-1][:6]
+    top_dem = np.argsort(dem_sims)[::-1][:6]
+
+    crowding = float(np.sort(sup_sims)[::-1][:8].mean())
+    demand_pull = float(np.sort(dem_sims)[::-1][:8].mean())
+
+    if crowding > 0.42:
+        verdict = "Crowded. Several funded companies sit close to this."
+    elif crowding > 0.30:
+        verdict = "Contested. There's adjacent funded work, but nothing dead-on."
+    else:
+        verdict = "Open. Nothing funded sits especially close to this."
+
+    return {
+        "crowding": round(crowding, 3),
+        "demand_pull": round(demand_pull, 3),
+        "verdict": verdict,
+        "nearest_companies": [
+            {
+                "name": supply_meta[int(i)]["name"],
+                "one_liner": supply_meta[int(i)]["one_liner"],
+                "batch": supply_meta[int(i)]["batch"],
+                "sim": round(float(sup_sims[int(i)]), 3),
+            }
+            for i in top_sup
+        ],
+        "nearest_demand": [
+            {
+                "title": demand_meta[int(i)]["title"],
+                "url": demand_meta[int(i)]["url"],
+                "sim": round(float(dem_sims[int(i)]), 3),
+            }
+            for i in top_dem
+        ],
+    }
 
 
 @app.get("/api/whitespace")

@@ -250,6 +250,24 @@
             <label class="wide">Short bio<textarea id="p-bio" rows="3" placeholder="Anything a professor should know in one line.">${esc(p.bio || "")}</textarea></label>
             <label>School<input id="p-school" value="${esc(p.school || "")}" placeholder="Princeton University"></label>
             <label>Student org<input id="p-org" value="${esc(p.org || "")}" placeholder="Princeton Student Ventures"></label>
+            <label>Stage
+              <select id="p-stage">
+                ${["", "idea", "prototype", "early users", "raising"]
+                  .map((s) => `<option value="${s}" ${p.stage === s ? "selected" : ""}>${s || "—"}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <label>Commitment
+              <select id="p-commitment">
+                ${["", "nights & weekends", "part-time", "full-time"]
+                  .map((s) => `<option value="${s}" ${p.commitment === s ? "selected" : ""}>${s || "—"}</option>`)
+                  .join("")}
+              </select>
+            </label>
+            <label class="wide">Skills<input id="p-skills" value="${esc(p.skills || "")}" placeholder="Python, microfluidics, assay design"></label>
+            <label>Website<input id="p-website" value="${esc(p.website || "")}" placeholder="alexzeng.dev"></label>
+            <label>GitHub<input id="p-github" value="${esc(p.github || "")}" placeholder="AlexZ0601"></label>
+            <label>LinkedIn<input id="p-linkedin" value="${esc(p.linkedin || "")}" placeholder="in/alexzeng"></label>
           </div>
           <label class="toggle-row">
             <input type="checkbox" id="p-looking" ${p.looking === 0 ? "" : "checked"}>
@@ -285,9 +303,104 @@
         </section>
       </div>`;
 
+    $("account-body").querySelector(".pane-inner").insertAdjacentHTML("beforeend", settingsHTML());
     $("signout").onclick = signOut;
     $("save-profile").onclick = saveProfile;
     $("resume-file").onchange = uploadResume;
+    wireSettings();
+  }
+
+  /* ── account settings ────────────────────────────── */
+
+  function settingsHTML() {
+    return `
+      <section class="card-block">
+        <h3>Account</h3>
+        <p class="block-note">Change your password, take your data with you, or leave.</p>
+
+        <div class="profile-grid">
+          <label>Current password<input type="password" id="pw-old" autocomplete="current-password"></label>
+          <label>New password<input type="password" id="pw-new" autocomplete="new-password" placeholder="at least 8 characters"></label>
+        </div>
+        <div class="row-end">
+          <span class="save-state" id="pw-state"></span>
+          <button class="ghost-btn" id="pw-save">Change password</button>
+        </div>
+
+        <div class="settings-row">
+          <div>
+            <b>Export your data</b>
+            <p class="block-note" style="margin:2px 0 0">Everything we hold on you, as JSON.</p>
+          </div>
+          <button class="ghost-btn" id="export-btn">Download</button>
+        </div>
+
+        <div class="settings-row danger">
+          <div>
+            <b>Delete account</b>
+            <p class="block-note" style="margin:2px 0 0">
+              Permanent. Removes your profile, resume, and the messages you sent.
+            </p>
+          </div>
+          <button class="ghost-btn danger-btn" id="del-open">Delete…</button>
+        </div>
+        <div class="danger-confirm" id="del-confirm" hidden>
+          <p>Type <b>DELETE</b> to confirm. This cannot be undone.</p>
+          <div class="row-end" style="justify-content:flex-start;gap:10px">
+            <input id="del-input" placeholder="DELETE" autocomplete="off">
+            <button class="ghost-btn danger-btn" id="del-go">Delete permanently</button>
+            <button class="ghost-btn" id="del-cancel">Cancel</button>
+          </div>
+          <p class="save-state" id="del-state"></p>
+        </div>
+      </section>`;
+  }
+
+  function wireSettings() {
+    $("pw-save").onclick = async () => {
+      const st = $("pw-state");
+      st.textContent = "Saving…";
+      try {
+        await api("/api/account/password", {
+          method: "POST",
+          body: JSON.stringify({
+            current: $("pw-old").value,
+            new_password: $("pw-new").value,
+          }),
+        });
+        st.textContent = "Password changed.";
+        $("pw-old").value = $("pw-new").value = "";
+      } catch (e) {
+        st.textContent = e.message;
+      }
+    };
+
+    $("export-btn").onclick = async () => {
+      const data = await api("/api/account/export");
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "cofoundr-export.json";
+      a.click();
+      URL.revokeObjectURL(a.href);
+    };
+
+    $("del-open").onclick = () => ($("del-confirm").hidden = false);
+    $("del-cancel").onclick = () => ($("del-confirm").hidden = true);
+    $("del-go").onclick = async () => {
+      const st = $("del-state");
+      try {
+        await api("/api/account/delete", {
+          method: "POST",
+          body: JSON.stringify({ confirm: $("del-input").value }),
+        });
+        A.user = null;
+        paintNav();
+        window.showView("search-view");
+      } catch (e) {
+        st.textContent = e.message;
+      }
+    };
   }
 
   async function saveProfile() {
@@ -304,6 +417,12 @@
           school: $("p-school").value.trim(),
           org: $("p-org").value.trim(),
           looking: $("p-looking").checked,
+          stage: $("p-stage").value,
+          commitment: $("p-commitment").value,
+          skills: $("p-skills").value.trim(),
+          website: $("p-website").value.trim(),
+          github: $("p-github").value.trim(),
+          linkedin: $("p-linkedin").value.trim(),
         }),
       });
       state.textContent = "Saved.";

@@ -1139,6 +1139,128 @@ body:has(#gradient-bg) { background-image: none; background-color: transparent; 
   .facet-label { min-width: 0; width: 100%; }
 }
 
+/* ── techy grid ────────────────────────────────────── */
+
+/* Perspective grid receding to the horizon, plus a slow scan sweep. Pure CSS
+   over the shader, so it costs nothing and reads as instrumentation rather
+   than decoration. */
+.techgrid {
+  position: fixed; inset: 0; z-index: 0; pointer-events: none;
+  overflow: hidden;
+  opacity: .5;
+  -webkit-mask-image: linear-gradient(to bottom, #000 0%, transparent 62%);
+  mask-image: linear-gradient(to bottom, #000 0%, transparent 62%);
+}
+.techgrid::before {
+  content: ""; position: absolute; inset: -50% -50% 0 -50%;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--accent) 22%, transparent) 1px, transparent 1px);
+  background-size: 46px 46px;
+  transform: perspective(340px) rotateX(58deg);
+  transform-origin: top center;
+  animation: grid-drift 22s linear infinite;
+}
+@keyframes grid-drift { to { background-position: 0 46px; } }
+
+/* one bright line sweeping down, like a readout refreshing */
+.techgrid::after {
+  content: ""; position: absolute; left: 0; right: 0; height: 140px;
+  background: linear-gradient(to bottom, transparent,
+              color-mix(in srgb, var(--accent) 12%, transparent), transparent);
+  animation: scan 7.5s ease-in-out infinite;
+}
+@keyframes scan {
+  0%   { transform: translateY(-150px); opacity: 0; }
+  12%  { opacity: 1; }
+  88%  { opacity: 1; }
+  100% { transform: translateY(90vh); opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .techgrid::before, .techgrid::after { animation: none; }
+  .techgrid::after { display: none; }
+}
+
+/* ── researcher directory ──────────────────────────── */
+
+.dir-grid {
+  width: min(1080px, calc(100% - 44px));
+  margin: 0 auto; padding: 16px 0 8px;
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(268px, 1fr)); gap: 12px;
+}
+.dir-card {
+  background: color-mix(in srgb, var(--bg-elev) 74%, transparent);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border: 1px solid var(--line); border-radius: var(--radius);
+  padding: 17px 18px;
+  display: flex; flex-direction: column; gap: 7px;
+  transition: border-color .2s, transform .2s var(--ease);
+}
+.dir-card:hover { border-color: var(--accent); transform: translateY(-2px); }
+.dir-card header { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.dir-card h3 { font-family: var(--serif); font-weight: 400; font-size: 18px; margin: 0; }
+.dir-claimed {
+  flex: none; font-size: 10px; color: var(--accent);
+  border: 1px solid var(--accent-soft); background: var(--accent-soft);
+  border-radius: 6px; padding: 2px 6px;
+}
+.dir-dept { margin: 0; color: var(--accent); font-size: 12px; font-weight: 600; }
+.dir-recent { margin: 0; color: var(--text-dim); font-size: 12.5px; line-height: 1.45; }
+.dir-stats { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.dir-stats span {
+  font-size: 11px; color: var(--text-faint);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-radius: 6px; padding: 3px 7px;
+}
+.dir-stats .is-pi { color: var(--accent); border-color: var(--accent-soft); background: var(--accent-soft); }
+.dir-find { margin-top: 6px; font-size: 12.5px; padding: 8px 12px; }
+.dir-more { display: grid; place-items: center; padding: 8px 0 60px; }
+
+/* ── market check meters ───────────────────────────── */
+
+.pos-verdict { font-family: var(--serif); font-weight: 400; font-size: 23px; margin: 0 0 18px; }
+.meter { margin-bottom: 14px; }
+.meter-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--text-dim); margin-bottom: 6px; }
+.meter-head b { color: var(--text); font-variant-numeric: tabular-nums; }
+.meter-track { height: 6px; border-radius: 999px; background: var(--surface-2); overflow: hidden; }
+.meter-fill {
+  height: 100%; border-radius: 999px;
+  background: linear-gradient(90deg, var(--accent), #f472b6);
+  transition: width .6s var(--ease);
+}
+
+.deck-empty-actions { display: flex; gap: 10px; justify-content: center; flex-wrap: wrap; }
+.ws-detail-actions { display: flex; gap: 9px; flex-wrap: wrap; margin: 4px 0 18px; }
+.ws-detail-actions .btn-primary, .ws-detail-actions .ghost-btn { font-size: 13px; padding: 9px 14px; }
+
+/* ── settings ──────────────────────────────────────── */
+
+.profile-grid select {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px;
+  color: var(--text); font: inherit; font-size: 14px; outline: none;
+}
+.profile-grid select:focus { border-color: var(--accent); }
+
+.settings-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  padding: 16px 0; border-top: 1px solid var(--line-soft);
+}
+.settings-row b { font-size: 14px; }
+.settings-row.danger b { color: var(--pass); }
+.danger-btn { color: var(--pass); border-color: color-mix(in srgb, var(--pass) 40%, transparent); }
+.danger-btn:hover { color: #fff; background: var(--pass); border-color: var(--pass); }
+.danger-confirm {
+  border: 1px solid var(--pass); background: var(--pass-soft);
+  border-radius: var(--radius-sm); padding: 14px 16px; margin-top: 6px;
+}
+.danger-confirm p { margin: 0 0 10px; font-size: 13px; color: var(--text); }
+.danger-confirm input {
+  background: var(--bg); border: 1px solid var(--line);
+  border-radius: 8px; padding: 9px 11px; color: var(--text); font: inherit;
+}
+
 /* ── toast ─────────────────────────────────────────── */
 
 .toast {

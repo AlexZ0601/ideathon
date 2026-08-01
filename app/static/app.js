@@ -4,6 +4,7 @@
 const $ = (id) => document.getElementById(id);
 const VISIBLE = 3;
 const THROW = 110;           // px of drag past which release commits the swipe
+const PAGE = 25;             // matches fetched per batch; "load more" asks for another
 
 const state = {
   problem: "",
@@ -62,7 +63,7 @@ $("search-form").addEventListener("submit", async (e) => {
     const res = await fetch("/api/match", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ problem, k: 12 }),
+      body: JSON.stringify({ problem, k: PAGE }),
     });
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
@@ -134,8 +135,8 @@ function renderDeck() {
 
   if (done) {
     $("deck-empty-sub").textContent = state.shortlist.length
-      ? `You shortlisted ${state.shortlist.length}.`
-      : "You passed on everyone — try rephrasing the problem.";
+      ? `You shortlisted ${state.shortlist.length} of ${state.matches.length}.`
+      : "You passed on all of them — try rephrasing the problem, or pull more.";
     return;
   }
 
@@ -314,6 +315,10 @@ let lastMatch = null;
 
 async function openIntro(match) {
   lastMatch = match;
+  // the market-check and hub-compose flows borrow this modal and hide buttons
+  $("copy-btn").hidden = false;
+  $("send-btn").hidden = false;
+  $("send-btn").querySelector("span").textContent = "Send via cofoundr";
   const modal = $("intro-modal");
   modal.hidden = false;
   $("intro-body").innerHTML = `<div class="spinner"></div><p class="loading-note">Drafting an email that cites ${esc(match.matched_work.title.slice(0, 60))}…</p>`;
@@ -405,6 +410,83 @@ const openMap = () => {
 $("open-map").onclick = openMap;
 $("open-map-2").onclick = openMap;
 $("open-hub").onclick = () => window.Hub.open();
+$("open-dir").onclick = () => window.Directory.open();
+
+/* Market check: the same problem text, run against the White Space corpora.
+   Tells a founder whether the thing they're already building sits in open
+   territory or in a crowd of funded companies. */
+$("position-btn").onclick = async () => {
+  if (!state.problem) return;
+  const modal = $("intro-modal");
+  modal.hidden = false;
+  $("copy-btn").hidden = true;
+  $("send-btn").hidden = true;
+  $("intro-hint").textContent = "";
+  $("intro-body").innerHTML = `<div class="spinner"></div><p class="loading-note">Placing this against 6,049 funded companies…</p>`;
+
+  try {
+    const res = await fetch("/api/whitespace/position", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ problem: state.problem }),
+    });
+    const d = await res.json();
+    if (!res.ok) throw new Error(d.detail);
+
+    const bar = (v, label) => `
+      <div class="meter">
+        <div class="meter-head"><span>${label}</span><b>${v.toFixed(2)}</b></div>
+        <div class="meter-track"><div class="meter-fill" style="width:${Math.min(v / 0.6, 1) * 100}%"></div></div>
+      </div>`;
+
+    $("intro-body").innerHTML = `
+      <p class="ws-detail-kicker">Market check</p>
+      <h3 class="pos-verdict">${esc(d.verdict)}</h3>
+      ${bar(d.crowding, "How close funded companies sit")}
+      ${bar(d.demand_pull, "How loudly people are asking")}
+      <h4>Closest funded companies</h4>
+      <ul class="ws-near">
+        ${d.nearest_companies.map((c) => `<li><b>${esc(c.name)}</b>${c.batch ? ` <em>(${esc(c.batch)})</em>` : ""} — ${esc(c.one_liner)}</li>`).join("")}
+      </ul>
+      <h4>People describing this problem</h4>
+      <ul class="ws-posts">
+        ${d.nearest_demand.map((p) => `<li><a href="${esc(p.url)}" target="_blank" rel="noopener">${esc(p.title)}</a></li>`).join("")}
+      </ul>`;
+    $("intro-hint").textContent =
+      "Embedding distance, not market research. A crowded score means someone " +
+      "funded is semantically near — not that they've won.";
+  } catch (e) {
+    $("intro-body").innerHTML = `<p class="loading-note">${esc(e.message || "Market check failed.")}</p>`;
+  }
+};
+
+// Pull the next batch. match() is deterministic and ordered, so asking for a
+// bigger k returns the same head plus a longer tail — we append only the tail.
+$("load-more-btn").onclick = async () => {
+  const btn = $("load-more-btn");
+  btn.disabled = true;
+  btn.textContent = "Searching…";
+  try {
+    const res = await fetch("/api/match", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ problem: state.problem, k: state.matches.length + PAGE }),
+    });
+    const data = await res.json();
+    const fresh = data.matches.slice(state.matches.length);
+    if (!fresh.length) {
+      btn.textContent = "No more matches";
+      return;
+    }
+    state.matches = state.matches.concat(fresh);
+    renderDeck();
+  } catch {
+    toast("Couldn't load more — is the server still running?");
+  } finally {
+    btn.disabled = false;
+    if (btn.textContent === "Searching…") btn.textContent = `Load ${PAGE} more`;
+  }
+};
 // hub.js needs the toast without importing this module
 window.toastMsg = toast;
 $("ws-back").onclick = () => show("search-view");

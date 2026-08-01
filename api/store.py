@@ -97,6 +97,12 @@ LATER_COLUMNS = [
     ("founder_profiles", "school", "TEXT"),
     ("founder_profiles", "org", "TEXT"),
     ("founder_profiles", "looking", "INTEGER"),   # visible in the hub at all
+    ("founder_profiles", "website", "TEXT"),
+    ("founder_profiles", "github", "TEXT"),
+    ("founder_profiles", "linkedin", "TEXT"),
+    ("founder_profiles", "skills", "TEXT"),
+    ("founder_profiles", "stage", "TEXT"),        # idea / prototype / users / raising
+    ("founder_profiles", "commitment", "TEXT"),   # nights+weekends / part time / full time
 ]
 
 
@@ -272,7 +278,10 @@ def get_founder_profile(uid):
 
 
 def upsert_founder_profile(uid, **fields):
-    allowed = {"year", "major", "project", "bio", "school", "org", "looking"}
+    allowed = {
+        "year", "major", "project", "bio", "school", "org", "looking",
+        "website", "github", "linkedin", "skills", "stage", "commitment",
+    }
     fields = {k: v for k, v in fields.items() if k in allowed}
     if not fields:
         return
@@ -297,6 +306,33 @@ def set_resume(uid, name, text):
 
 
 # ── claims ─────────────────────────────────────────────
+
+def change_password(uid, pw_hash):
+    con = db()
+    con.execute("UPDATE users SET pw_hash = ? WHERE id = ?", (pw_hash, uid))
+    con.commit()
+
+
+def export_account(uid):
+    """Everything held about one account, for the data-export link in settings."""
+    user = user_by_id(uid) or {}
+    user.pop("pw_hash", None)
+    return {
+        "account": user,
+        "profile": get_founder_profile(uid),
+        "claim": get_claim(uid),
+        "sent": sent(uid),
+        "received": inbox(uid),
+    }
+
+
+def delete_account(uid):
+    """Hard delete. Cascades take the profile, claim, and authored messages;
+    messages *to* this user keep their thread but lose the recipient link."""
+    con = db()
+    con.execute("DELETE FROM users WHERE id = ?", (uid,))
+    con.commit()
+
 
 def get_claim(uid):
     return row_to_dict(

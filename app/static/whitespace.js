@@ -363,6 +363,29 @@
       <ul class="ws-near">${near}</ul>
       <h4>Real posts in this cluster</h4>
       <ul class="ws-posts">${posts}</ul>`;
+    // The map finds the opening; the matcher finds who could build it. Without
+    // this the map is a poster — with it, a gap is one click from real people.
+    const act = document.createElement("div");
+    act.className = "ws-detail-actions";
+    act.innerHTML = `
+      <button class="btn-primary" id="ws-find"><span>Find researchers for this</span></button>
+      <button class="ghost-btn" id="ws-hub">Who else is building here</button>`;
+    $("ws-detail").insertBefore(act, $("ws-detail").querySelector("h4"));
+
+    $("ws-find").onclick = () => {
+      const seed = `${c.name}. ${c.thesis || ""}`.trim();
+      window.showView("search-view");
+      const input = document.getElementById("problem-input");
+      input.value = seed;
+      document.getElementById("search-form").requestSubmit();
+    };
+    $("ws-hub").onclick = () => {
+      window.Hub.open();
+      const q = document.getElementById("hub-q");
+      q.value = c.name.split(/[\s,]+/).slice(0, 2).join(" ");
+      q.dispatchEvent(new Event("input"));
+    };
+
     $("ws-detail").hidden = false;
     $("ws-detail-close").onclick = () => {
       $("ws-detail").hidden = true;
