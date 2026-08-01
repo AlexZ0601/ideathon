@@ -582,6 +582,61 @@ kbd {
 
 .sl-empty { color: var(--text-dim); margin-top: 60px; text-align: center; }
 
+/* ── outreach pipeline ─────────────────────────────── */
+
+.sl-warn {
+  width: min(700px, 100%); margin: 0;
+  background: var(--accent-soft); border: 1px solid var(--accent);
+  border-radius: var(--radius-sm); padding: 11px 14px;
+  color: var(--text); font-size: 13px;
+}
+
+.pipeline {
+  width: min(700px, 100%);
+  display: flex; flex-wrap: wrap; gap: 8px;
+  padding-bottom: 4px;
+}
+.pipe-step {
+  font-family: var(--mono); font-size: 11px; letter-spacing: .04em;
+  color: var(--text-dim);
+  background: var(--surface-2); border: 1px solid var(--line-soft);
+  border-radius: 7px; padding: 6px 10px;
+}
+.pipe-step b { color: var(--accent); font-weight: 700; margin-right: 4px; }
+
+.sl-item.outreach { align-items: flex-start; }
+.sl-problem { margin: 6px 0 0; color: var(--text-faint); font-size: 12px; font-style: italic; }
+
+.status-row { display: flex; flex-wrap: wrap; gap: 5px; margin: 12px 0 10px; }
+.status-pill {
+  background: transparent; border: 1px solid var(--line-soft);
+  color: var(--text-faint); border-radius: 999px;
+  padding: 5px 11px; font: inherit; font-size: 11.5px; cursor: pointer;
+  transition: color .15s, border-color .15s, background .15s;
+}
+.status-pill:hover { color: var(--text); border-color: var(--line); }
+.status-pill.is-on {
+  color: var(--accent); border-color: var(--accent);
+  background: var(--accent-soft); font-weight: 600;
+}
+
+.sl-note {
+  width: 100%; min-height: 34px; resize: vertical;
+  background: var(--bg); border: 1px solid var(--line-soft);
+  border-radius: 8px; padding: 8px 10px;
+  color: var(--text); font: inherit; font-size: 13px; outline: none;
+  transition: border-color .2s;
+}
+.sl-note:focus { border-color: var(--accent); }
+
+.sl-actions { display: flex; flex-direction: column; gap: 7px; flex: none; }
+.sl-actions .ghost-btn { font-size: 12px; padding: 7px 12px; }
+
+@media (max-width: 620px) {
+  .sl-item.outreach { flex-direction: column; }
+  .sl-actions { flex-direction: row; width: 100%; }
+}
+
 /* ── modal ─────────────────────────────────────────── */
 
 .modal-backdrop {

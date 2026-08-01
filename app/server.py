@@ -175,7 +175,56 @@ def api_intro(req: IntroRequest, user=Depends(current_user)):
     CACHE_DIR.mkdir(parents=True, exist_ok=True)
     with open(path, "w") as f:
         json.dump(payload, f)
+    if user:
+        store.shortlist_advance(user["id"], req.researcher_id, "drafted")
     return {"cached": False, **payload}
+
+
+# ── shortlist / outreach ───────────────────────────────
+
+class ShortlistAdd(BaseModel):
+    researcher_id: str
+    name: str | None = None
+    dept: str | None = None
+    work_id: str | None = None
+    work_title: str | None = None
+    problem: str | None = None
+    rationale: str | None = None
+
+
+class ShortlistPatch(BaseModel):
+    status: str | None = None
+    note: str | None = None
+
+
+@app.get("/api/shortlist")
+def api_shortlist(user=Depends(require_user)):
+    rows = store.shortlist_list(user["id"])
+    counts = {}
+    for r in rows:
+        counts[r["status"]] = counts.get(r["status"], 0) + 1
+    return {"shortlist": rows, "counts": counts, "statuses": store.STATUSES}
+
+
+@app.post("/api/shortlist")
+def api_shortlist_add(req: ShortlistAdd, user=Depends(require_user)):
+    store.shortlist_add(user["id"], req.researcher_id, **req.model_dump(exclude={"researcher_id"}))
+    return {"ok": True}
+
+
+@app.patch("/api/shortlist/{researcher_id:path}")
+def api_shortlist_patch(researcher_id: str, req: ShortlistPatch, user=Depends(require_user)):
+    try:
+        store.shortlist_update(user["id"], researcher_id, status=req.status, note=req.note)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+    return {"ok": True}
+
+
+@app.delete("/api/shortlist/{researcher_id:path}")
+def api_shortlist_delete(researcher_id: str, user=Depends(require_user)):
+    store.shortlist_remove(user["id"], researcher_id)
+    return {"ok": True}
 
 
 # ── accounts ───────────────────────────────────────────
@@ -704,6 +753,10 @@ def api_send(req: MessageRequest, user=Depends(require_user)):
         to_researcher=None if owner else req.researcher_id,
         paper_title=req.paper_title,
     )
+    # sending is the strongest signal there is, so the row jumps to "sent"
+    # and remembers the thread — a reply on it later reads back as "replied"
+    store.shortlist_advance(user["id"], req.researcher_id, "sent", thread_id=mid)
+
     return {
         "ok": True,
         "thread_id": mid,

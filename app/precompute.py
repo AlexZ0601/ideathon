@@ -27,7 +27,7 @@ def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--intros", type=int, default=3, help="intros to pre-draft per scenario")
     p.add_argument("--refresh", action="store_true")
-    p.add_argument("--k", type=int, default=12)
+    p.add_argument("--k", type=int, default=25)  # must match PAGE in app.js or the cache misses
     # The founder profile is part of the intro cache key, so warming the cache
     # with the wrong one means the demo still calls the API live.
     p.add_argument("--name", help="your name, as the app's profile panel has it")
@@ -53,7 +53,11 @@ def main():
 
     for scenario in SCENARIOS:
         problem = scenario["text"]
-        result = api_match(MatchRequest(problem=problem, k=args.k, refresh=args.refresh))
+        # called directly, so FastAPI's dependency injection never runs —
+        # the user argument has to be passed explicitly
+        result = api_match(
+            MatchRequest(problem=problem, k=args.k, refresh=args.refresh), user=None
+        )
         matches = result["matches"]
         rationales = sum(1 for m in matches if m.get("rationale"))
         print(
@@ -69,7 +73,8 @@ def main():
                     problem=problem,
                     founder=founder,
                     refresh=args.refresh,
-                )
+                ),
+                user=None,
             )
             total_intros += 1
             tag = "cached" if email["cached"] else "drafted"

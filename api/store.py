@@ -66,6 +66,28 @@ CREATE TABLE IF NOT EXISTS messages (
   read_at        REAL
 );
 
+-- Saved researchers and where each one stands. One row per person per user:
+-- shortlisting the same researcher from a second search updates the row rather
+-- than creating a duplicate, so the outreach history survives re-searching.
+CREATE TABLE IF NOT EXISTS shortlist (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id       INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  researcher_id TEXT NOT NULL,
+  name          TEXT,
+  dept          TEXT,
+  work_id       TEXT,
+  work_title    TEXT,
+  problem       TEXT,
+  rationale     TEXT,
+  note          TEXT,
+  status        TEXT NOT NULL DEFAULT 'saved',
+  thread_id     INTEGER,
+  created_at    REAL NOT NULL,
+  updated_at    REAL NOT NULL,
+  UNIQUE (user_id, researcher_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_short_user ON shortlist(user_id);
 CREATE INDEX IF NOT EXISTS idx_msg_to_user ON messages(to_user);
 CREATE INDEX IF NOT EXISTS idx_msg_to_res  ON messages(to_researcher);
 CREATE INDEX IF NOT EXISTS idx_msg_thread  ON messages(thread_id);
@@ -306,6 +328,109 @@ def set_resume(uid, name, text):
 
 
 # ── claims ─────────────────────────────────────────────
+
+# ── shortlist / outreach ───────────────────────────────
+
+# Ordered: a status may only move forward automatically. A person who has
+# already replied shouldn't be knocked back to "drafted" because you opened
+# the draft again.
+STATUSES = ["saved", "drafted", "sent", "replied", "meeting", "passed"]
+STATUS_RANK = {s: i for i, s in enumerate(STATUSES)}
+
+
+def shortlist_add(uid, researcher_id, **fields):
+    """Save a researcher, or refresh the evidence if they're already saved."""
+    now = time.time()
+    keep = {k: fields.get(k) for k in
+            ("name", "dept", "work_id", "work_title", "problem", "rationale")}
+    con = db()
+    con.execute(
+        "INSERT INTO shortlist (user_id, researcher_id, name, dept, work_id, work_title,"
+        " problem, rationale, created_at, updated_at) VALUES (?,?,?,?,?,?,?,?,?,?) "
+        "ON CONFLICT(user_id, researcher_id) DO UPDATE SET "
+        " work_id=excluded.work_id, work_title=excluded.work_title,"
+        " problem=excluded.problem, rationale=excluded.rationale, updated_at=excluded.updated_at",
+        (uid, researcher_id, keep["name"], keep["dept"], keep["work_id"], keep["work_title"],
+         keep["problem"], keep["rationale"], now, now),
+    )
+    con.commit()
+
+
+def shortlist_list(uid):
+    rows = db().execute(
+        "SELECT * FROM shortlist WHERE user_id = ? ORDER BY updated_at DESC", (uid,)
+    ).fetchall()
+    out = []
+    for r in rows:
+        d = row_to_dict(r)
+        # a reply on the thread is the ground truth, not whatever we last stored
+        if d["thread_id"]:
+            replied = db().execute(
+                "SELECT 1 FROM messages WHERE thread_id = ? AND to_user = ? LIMIT 1",
+                (d["thread_id"], uid),
+            ).fetchone()
+            if replied and STATUS_RANK.get(d["status"], 0) < STATUS_RANK["replied"]:
+                d["status"] = "replied"
+        out.append(d)
+    return out
+
+
+def shortlist_update(uid, researcher_id, status=None, note=None):
+    sets, vals = [], []
+    if status is not None:
+        if status not in STATUSES:
+            raise ValueError(f"unknown status: {status}")
+        sets.append("status = ?")
+        vals.append(status)
+    if note is not None:
+        sets.append("note = ?")
+        vals.append(note)
+    if not sets:
+        return
+    sets.append("updated_at = ?")
+    vals.append(time.time())
+    con = db()
+    con.execute(
+        f"UPDATE shortlist SET {', '.join(sets)} WHERE user_id = ? AND researcher_id = ?",
+        (*vals, uid, researcher_id),
+    )
+    con.commit()
+
+
+def shortlist_advance(uid, researcher_id, status, thread_id=None):
+    """Move a row forward if the new status is further along. Never backward."""
+    row = db().execute(
+        "SELECT status FROM shortlist WHERE user_id = ? AND researcher_id = ?",
+        (uid, researcher_id),
+    ).fetchone()
+    if not row:
+        return
+    if STATUS_RANK.get(status, 0) <= STATUS_RANK.get(row["status"], 0) and thread_id is None:
+        return
+    con = db()
+    if thread_id is not None:
+        con.execute(
+            "UPDATE shortlist SET status = ?, thread_id = ?, updated_at = ? "
+            "WHERE user_id = ? AND researcher_id = ?",
+            (max(status, row["status"], key=lambda s: STATUS_RANK.get(s, 0)),
+             thread_id, time.time(), uid, researcher_id),
+        )
+    else:
+        con.execute(
+            "UPDATE shortlist SET status = ?, updated_at = ? "
+            "WHERE user_id = ? AND researcher_id = ?",
+            (status, time.time(), uid, researcher_id),
+        )
+    con.commit()
+
+
+def shortlist_remove(uid, researcher_id):
+    con = db()
+    con.execute(
+        "DELETE FROM shortlist WHERE user_id = ? AND researcher_id = ?", (uid, researcher_id)
+    )
+    con.commit()
+
 
 def change_password(uid, pw_hash):
     con = db()

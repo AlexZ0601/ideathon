@@ -198,7 +198,10 @@ function attachDrag(el, match) {
 }
 
 function commit(el, match, verdict) {
-  if (verdict === "keep") state.shortlist.push(match);
+  if (verdict === "keep") {
+    state.shortlist.push(match);
+    saveShortlisted(match);
+  }
   updateShortlistCount();
 
   el.classList.add("is-animating");
@@ -232,36 +235,180 @@ function updateShortlistCount() {
   $("shortlist-count").textContent = String(state.shortlist.length);
 }
 
-function renderShortlist() {
+/* Shortlisting writes through to the server when signed in, so the list
+   survives a refresh and carries outreach state. Signed out it stays in
+   memory and the view says so rather than silently losing the work. */
+
+const STATUS_LABEL = {
+  saved: "Saved",
+  drafted: "Draft written",
+  sent: "Sent",
+  replied: "They replied",
+  meeting: "Meeting booked",
+  passed: "Passed",
+};
+
+async function saveShortlisted(match) {
+  if (!window.Accounts?.user) return;
+  try {
+    await fetch("/api/shortlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        researcher_id: match.researcher_id,
+        name: match.name,
+        dept: match.dept,
+        work_id: match.matched_work?.id,
+        work_title: match.matched_work?.title,
+        problem: state.problem,
+        rationale: match.rationale,
+      }),
+    });
+  } catch {
+    /* the in-memory copy still works for this session */
+  }
+}
+
+async function renderShortlist() {
   const list = $("shortlist-list");
-  list.innerHTML = "";
-  if (!state.shortlist.length) {
+
+  if (!window.Accounts?.user) {
+    // signed out: session-only, and honest about it
+    if (!state.shortlist.length) {
+      list.innerHTML = `<p class="sl-empty">Nothing shortlisted yet. Swipe right on a researcher whose paper looks relevant.</p>`;
+      return;
+    }
+    list.innerHTML =
+      `<p class="sl-warn">You're not signed in, so this list disappears when you reload.
+        <button class="link-btn" id="sl-signin">Sign in to keep it</button></p>` +
+      state.shortlist
+        .map(
+          (m, i) => `
+        <div class="sl-item">
+          <div class="sl-main">
+            <h3 class="sl-name">${esc(m.name)}</h3>
+            <p class="sl-dept">${esc(m.dept || "Princeton University")}</p>
+            <p class="sl-paper">${esc(m.matched_work.title)} <span>(${m.matched_work.year ?? "n.d."})</span></p>
+          </div>
+          <button class="btn-primary" data-mem="${i}"><span>Draft intro</span></button>
+        </div>`
+        )
+        .join("");
+    $("sl-signin").onclick = () => window.Accounts.openAuth("signup", renderShortlist);
+    list.querySelectorAll("[data-mem]").forEach((b) => {
+      b.onclick = () => openIntro(state.shortlist[+b.dataset.mem]);
+    });
+    return;
+  }
+
+  let data;
+  try {
+    data = await (await fetch("/api/shortlist")).json();
+  } catch {
+    list.innerHTML = `<p class="sl-empty">Couldn't load your shortlist.</p>`;
+    return;
+  }
+
+  if (!data.shortlist.length) {
     list.innerHTML = `<p class="sl-empty">Nothing shortlisted yet. Swipe right on a researcher whose paper looks relevant.</p>`;
     return;
   }
-  state.shortlist.forEach((m) => {
-    const item = document.createElement("div");
-    item.className = "sl-item";
-    item.innerHTML = `
-      <div class="sl-main">
-        <h3 class="sl-name">${esc(m.name)}</h3>
-        <p class="sl-dept">${esc(m.dept || "Princeton University")}</p>
-        <p class="sl-paper">${esc(m.matched_work.title)}
-          <span>(${m.matched_work.year ?? "n.d."})</span></p>
-      </div>
-    `;
-    const btn = document.createElement("button");
-    btn.className = "btn-primary";
-    btn.textContent = "Draft intro";
-    btn.onclick = () => openIntro(m);
-    item.append(btn);
-    list.append(item);
+
+  const pipeline = data.statuses
+    .filter((s) => data.counts[s])
+    .map((s) => `<span class="pipe-step"><b>${data.counts[s]}</b> ${STATUS_LABEL[s]}</span>`)
+    .join("");
+
+  list.innerHTML =
+    `<div class="pipeline">${pipeline}</div>` +
+    data.shortlist
+      .map(
+        (r) => `
+      <div class="sl-item outreach" data-rid="${esc(r.researcher_id)}">
+        <div class="sl-main">
+          <h3 class="sl-name">${esc(r.name || "Researcher")}</h3>
+          <p class="sl-dept">${esc(r.dept || "Princeton University")}</p>
+          ${r.work_title ? `<p class="sl-paper">${esc(r.work_title)}</p>` : ""}
+          ${r.problem ? `<p class="sl-problem">for: ${esc(r.problem)}</p>` : ""}
+          <div class="status-row">
+            ${data.statuses
+              .map(
+                (s) =>
+                  `<button class="status-pill ${r.status === s ? "is-on" : ""}" data-status="${s}">${STATUS_LABEL[s]}</button>`
+              )
+              .join("")}
+          </div>
+          <textarea class="sl-note" rows="1" placeholder="Add a note — what you asked, what they said…">${esc(r.note || "")}</textarea>
+        </div>
+        <div class="sl-actions">
+          <button class="btn-primary sl-draft"><span>Draft intro</span></button>
+          <button class="ghost-btn sl-remove" title="Remove">Remove</button>
+        </div>
+      </div>`
+      )
+      .join("");
+
+  list.querySelectorAll(".sl-item.outreach").forEach((item) => {
+    const rid = item.dataset.rid;
+
+    item.querySelectorAll(".status-pill").forEach((pill) => {
+      pill.onclick = async () => {
+        item.querySelectorAll(".status-pill").forEach((p) => p.classList.remove("is-on"));
+        pill.classList.add("is-on");
+        await patchShortlist(rid, { status: pill.dataset.status });
+        renderShortlist();
+      };
+    });
+
+    const note = item.querySelector(".sl-note");
+    let t;
+    note.oninput = () => {
+      clearTimeout(t);
+      t = setTimeout(() => patchShortlist(rid, { note: note.value }), 500);
+    };
+
+    item.querySelector(".sl-draft").onclick = () => {
+      const row = data.shortlist.find((x) => x.researcher_id === rid);
+      openIntro({
+        researcher_id: rid,
+        name: row.name,
+        dept: row.dept,
+        matched_work: { id: row.work_id, title: row.work_title || "", year: null },
+        rationale: row.rationale,
+      });
+      if (row.problem) state.problem = row.problem;
+    };
+
+    item.querySelector(".sl-remove").onclick = async () => {
+      await fetch(`/api/shortlist/${encodeURIComponent(rid)}`, { method: "DELETE" });
+      renderShortlist();
+    };
   });
+}
+
+async function patchShortlist(rid, body) {
+  try {
+    await fetch(`/api/shortlist/${encodeURIComponent(rid)}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    toast("Couldn't save that change.");
+  }
 }
 
 $("shortlist-btn").onclick = () => { renderShortlist(); show("shortlist-view"); };
 $("view-shortlist-btn").onclick = () => { renderShortlist(); show("shortlist-view"); };
-$("shortlist-back-btn").onclick = () => show("deck-view");
+// back goes wherever you came from: mid-search that's the deck, from the nav
+// there is no deck to go back to
+$("shortlist-back-btn").onclick = () =>
+  show(state.matches.length ? "deck-view" : "search-view");
+
+$("open-shortlist").onclick = () => {
+  show("shortlist-view");
+  renderShortlist();
+};
 $("back-btn").onclick = () => show("search-view");
 
 /* ── founder profile ─────────────────────────────── */
