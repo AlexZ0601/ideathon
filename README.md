@@ -1,8 +1,8 @@
 # Cofoundr
 
-Connects student founders to the Princeton faculty and researchers who can actually solve their technical problem — by matching on **published work**, not profiles.
+Connects student founders to the Princeton faculty and researchers who can actually solve their technical problem 
 
-Princeton's research output is public and indexed (papers, abstracts, lab pages, courses). Cofoundr builds the entire supply side of the marketplace from that public data, so a founder opens the app on day one and finds hundreds of researchers — no faculty signup required. Describe a technical blocker in plain language, get evidence-backed matches ("Prof. Chen's 2024 paper on thermostable enzyme scaffolds addresses this directly"), shortlist with a swipe, and generate a specific, credible, ready-to-send intro email that cites their actual work.
+Princeton's research output is public and indexed (papers, abstracts, lab pages, courses). Cofoundr builds the entire supply side of the marketplace from that public data, so a founder opens the app on day one and finds hundreds of researchers. Describe a technical blocker in plain language, get evidence-backed matches ("Prof. Chen's 2024 paper on thermostable enzyme scaffolds addresses this directly"), shortlist with a swipe, and generate a specific, credible, ready-to-send intro email that cites their actual work.
 
 Built for the PrincetonBuilds Ideathon.
 
